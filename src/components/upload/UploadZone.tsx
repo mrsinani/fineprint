@@ -10,7 +10,7 @@ export interface UploadZoneProps {
 }
 
 const DEFAULT_ACCEPT = ".pdf,.docx,.txt";
-const DEFAULT_MAX = "PDF, DOCX or TXT (max. 10MB)";
+const DEFAULT_MAX = "PDF, DOCX or TXT (max. 475 MB)";
 
 export function UploadZone({
   onFileSelect,
@@ -63,9 +63,10 @@ export function UploadZone({
       aria-label="Click to upload or drag and drop"
     >
       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-slate-200 text-slate-500 dark:bg-slate-600 dark:text-slate-400" aria-hidden>
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 16.5V9m0 0l-3 3m3-3l3 3" />
-          <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
         </svg>
       </div>
       <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
