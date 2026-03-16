@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { UploadZone, PendingFileRow, DocumentPreview } from "@/components/upload";
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
@@ -14,6 +14,21 @@ function formatFileSize(bytes: number): string {
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<UploadStatus>("pending");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Manage the creation and cleanup of the Object URL for previews
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    // Free up memory when the component unmounts or the file changes
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
 
   const handleFileSelect = useCallback((selected: File) => {
     setFile(selected);
@@ -59,13 +74,20 @@ export default function UploadPage() {
                   onClick={simulateUpload}
                   className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600"
                 >
-                  Start upload (demo)
+                  Upload
                 </button>
               )}
             </div>
 
             <div>
-              <DocumentPreview fileName={file.name} placeholder />
+              {/* Show placeholder while uploading, reveal preview when done (or change logic as desired) */}
+              <DocumentPreview 
+                fileName={file.name} 
+                fileType={file.type}
+                fileUrl={previewUrl}
+                file={file}
+                placeholder={status === "pending" || status === "uploading"} 
+              />
             </div>
           </>
         )}
@@ -73,4 +95,3 @@ export default function UploadPage() {
     </div>
   );
 }
-
