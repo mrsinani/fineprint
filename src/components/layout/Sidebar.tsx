@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: Home },
+  { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/upload", label: "Upload new", icon: Upload },
   { href: "/documents", label: "My documents", icon: FileText },
 ] as const;
@@ -50,8 +50,7 @@ function NavLink({
 
 export function Sidebar() {
   const pathname = usePathname();
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isActive = (href: string) => pathname.startsWith(href);
 
   return (
     <aside

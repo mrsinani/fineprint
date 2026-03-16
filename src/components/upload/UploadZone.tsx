@@ -60,11 +60,11 @@ export function UploadZone({
       }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      className="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-navy-700 bg-navy-900/50 px-6 py-16 transition-colors duration-200 hover:border-gold-500 hover:bg-gold-100/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-600"
+      className="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-blue-600 bg-navy-900/50 px-6 py-16 transition-colors duration-200 hover:border-blue-400 hover:bg-blue-100/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
       aria-label="Click to upload or drag and drop"
     >
       <div
-        className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-navy-850 text-navy-400 transition-colors duration-200 group-hover:bg-gold-100 group-hover:text-gold-600"
+        className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600/10 text-blue-600 transition-colors duration-200 group-hover:bg-blue-100 group-hover:text-blue-700"
         aria-hidden
       >
         <Upload size={24} strokeWidth={1.75} aria-hidden />

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
-import { AppLayout } from "@/components/layout";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -23,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${outfit.variable} antialiased`}>
-        <AppLayout>{children}</AppLayout>
+        {children}
       </body>
     </html>
   );
