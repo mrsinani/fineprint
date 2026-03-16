@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import * as mammoth from "mammoth";
 import { UploadZone, PendingFileRow, DocumentPreview } from "@/components/upload";
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
+type InputMode = "file" | "text";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -13,28 +13,30 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function UploadPage() {
-  // --- File State ---
+  const [mode, setMode] = useState<InputMode>("file");
+
+  // File state
   const [file, setFile] = useState<File | null>(null);
   const [fileStatus, setFileStatus] = useState<UploadStatus>("pending");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // --- Analysis State ---
+  // Text state
+  const [pastedText, setPastedText] = useState("");
+
+  // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
       return;
     }
-
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
-
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
 
-  // --- File Handlers ---
   const handleFileSelect = useCallback((selected: File) => {
     setFile(selected);
     setFileStatus("pending");
@@ -53,82 +55,50 @@ export default function UploadPage() {
     setTimeout(() => setFileStatus("done"), 1500);
   }, [file]);
 
-  // --- Text Extraction Helper ---
-  const extractTextFromFile = async (file: File): Promise<string> => {
-    if (file.type === "text/plain") {
-      return await file.text();
-    }
-    if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value;
-    }
-    throw new Error("Unsupported file type for text extraction. Please use .txt or .docx");
-  };
-
-  // --- Analyze Handler ---
-  const isReadyToAnalyze = fileStatus === "done";
+  const canAnalyze =
+    mode === "file" ? fileStatus === "done" : pastedText.trim().length > 0;
 
   const handleAnalyze = async () => {
-    if (!file) return;
-    
     setIsAnalyzing(true);
     setAnalysisResult(null);
 
     try {
-      const documentText = await extractTextFromFile(file);
+      let response: Response;
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: `You are an expert in legally analyzing any sort of document: from rent contracts to terms and conditions and ToS.
-
-Given a piece of text, your task is to do the following:
-1. Generate a plain language summary of the contract, so that the user can understand the overall meaning without reading dense legal text.
-2. Display the most risky clauses from the contract text with explanations, so that the user can understand exactly which parts may disadvantage them. Rank them based on level of risk: 0 being irrelevant, 1 being non-risky, 2 being moderate risky, 3 being highly risky, 4 being avoid at all costs
-3. Derive a risk score from 1 to 10 based on the contract text, so the user can gauge how cautious they must be with the text before signing.
-4. Generate a list of key obligations from the contract text, so that the user can understand what they are responsible for before agreeing.
-
-Once all these steps are performed, format the data EXACTLY in this JSON structure:
-{
-  "summary": "insert text here",
-  "risk_score": number,
-  "obligations": ["1234", "abcde"],
-  "risky_clauses": [["12345", 3], ["67890", 2]]
-}`
-            },
-            {
-              role: "user",
-              content: `Here is the document text to analyze:\n\n${documentText}`
-            }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.statusText}`);
+      if (mode === "file") {
+        if (!file) return;
+        const formData = new FormData();
+        formData.append("file", file);
+        response = await fetch("/api/analyze", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: pastedText }),
+        });
       }
 
       const data = await response.json();
-      const parsedContent = JSON.parse(data.choices[0].message.content);
-      
-      setAnalysisResult(parsedContent);
 
+      if (!response.ok) {
+        throw new Error(data.error || `Server error: ${response.status}`);
+      }
+
+      setAnalysisResult(data);
     } catch (error) {
       console.error("Analysis failed:", error);
       alert(error instanceof Error ? error.message : "Failed to analyze document.");
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const switchMode = (next: InputMode) => {
+    setMode(next);
+    setAnalysisResult(null);
   };
 
   return (
@@ -138,56 +108,96 @@ Once all these steps are performed, format the data EXACTLY in this JSON structu
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.1s forwards" }}
       >
         <h1 className="font-display text-3xl font-bold tracking-tight text-navy-100 sm:text-4xl">
-          Upload file
+          Analyze contract
         </h1>
         <p className="mt-2 text-[15px] text-navy-400">
-          Drop a contract to start your analysis.
+          Upload a file or paste contract text to start your analysis.
         </p>
       </div>
 
+      {/* Mode toggle */}
       <div
-        className="mt-10 flex flex-col gap-6 opacity-0"
+        className="mt-8 flex gap-1 rounded-lg bg-navy-850 p-1 opacity-0"
+        style={{ animation: "fp-fade-in-up 0.6s ease-out 0.2s forwards" }}
+      >
+        {(["file", "text"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => switchMode(tab)}
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              mode === tab
+                ? "bg-white text-navy-100 shadow-sm"
+                : "text-navy-400 hover:text-navy-200"
+            }`}
+          >
+            {tab === "file" ? "Upload File" : "Paste Text"}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className="mt-6 flex flex-col gap-6 opacity-0"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.25s forwards" }}
       >
-        <UploadZone onFileSelect={handleFileSelect} />
-
-        {file && (
+        {mode === "file" ? (
           <>
-            <div>
-              <h2 className="mb-3 text-[13px] font-medium uppercase tracking-[0.12em] text-navy-400">
-                Selected file
-              </h2>
-              <PendingFileRow
-                name={file.name}
-                size={formatFileSize(file.size)}
-                status={fileStatus}
-                onRemove={handleRemoveFile}
-              />
-              {fileStatus === "pending" && (
-                <button
-                  type="button"
-                  onClick={simulateFileUpload}
-                  className="mt-4 rounded-lg bg-gold-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-gold-700"
-                >
-                  Upload &amp; analyze
-                </button>
-              )}
-            </div>
+            <UploadZone onFileSelect={handleFileSelect} />
 
-            <div>
-              <DocumentPreview
-                fileName={file.name}
-                fileType={file.type}
-                fileUrl={previewUrl}
-                file={file}
-                placeholder={fileStatus === "pending" || fileStatus === "uploading"}
-              />
-            </div>
+            {file && (
+              <>
+                <div>
+                  <h2 className="mb-3 text-[13px] font-medium uppercase tracking-[0.12em] text-navy-400">
+                    Selected file
+                  </h2>
+                  <PendingFileRow
+                    name={file.name}
+                    size={formatFileSize(file.size)}
+                    status={fileStatus}
+                    onRemove={handleRemoveFile}
+                  />
+                  {fileStatus === "pending" && (
+                    <button
+                      type="button"
+                      onClick={simulateFileUpload}
+                      className="mt-4 rounded-lg bg-gold-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-gold-700"
+                    >
+                      Upload &amp; analyze
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <DocumentPreview
+                    fileName={file.name}
+                    fileType={file.type}
+                    fileUrl={previewUrl}
+                    file={file}
+                    placeholder={fileStatus === "pending" || fileStatus === "uploading"}
+                  />
+                </div>
+              </>
+            )}
           </>
+        ) : (
+          <div>
+            <textarea
+              value={pastedText}
+              onChange={(e) => {
+                setPastedText(e.target.value);
+                setAnalysisResult(null);
+              }}
+              placeholder="Paste your contract text here..."
+              rows={14}
+              className="w-full resize-y rounded-xl border border-navy-700 bg-navy-900 px-5 py-4 text-sm text-navy-100 placeholder:text-navy-500 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+            />
+            <p className="mt-2 text-right text-xs text-navy-500">
+              {pastedText.length.toLocaleString()} characters
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Analysis Result */}
       {analysisResult && (
         <div className="mt-8 rounded-xl bg-navy-100 p-6 text-sm text-green-400 overflow-x-auto">
           <h3 className="text-white font-bold mb-4">Analysis Result (Raw JSON)</h3>
@@ -195,8 +205,7 @@ Once all these steps are performed, format the data EXACTLY in this JSON structu
         </div>
       )}
 
-      {/* Floating Analyze Button */}
-      {isReadyToAnalyze && !analysisResult && (
+      {canAnalyze && !analysisResult && (
         <div className="fixed bottom-8 right-8 flex transform justify-center">
           <button
             type="button"
