@@ -16,17 +16,13 @@ export default function UploadPage() {
   const [status, setStatus] = useState<UploadStatus>("pending");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Manage the creation and cleanup of the Object URL for previews
   useEffect(() => {
     if (!file) {
       setPreviewUrl(null);
       return;
     }
-
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
-
-    // Free up memory when the component unmounts or the file changes
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
 
@@ -40,7 +36,6 @@ export default function UploadPage() {
     setStatus("pending");
   }, []);
 
-  /** Simulate upload for UI demo; no backend call. */
   const simulateUpload = useCallback(() => {
     if (!file) return;
     setStatus("uploading");
@@ -48,18 +43,29 @@ export default function UploadPage() {
   }, [file]);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10 sm:px-8">
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
-        Upload file
-      </h1>
+    <div className="mx-auto max-w-3xl px-8 py-12">
+      <div
+        className="opacity-0"
+        style={{ animation: "fp-fade-in-up 0.6s ease-out 0.1s forwards" }}
+      >
+        <h1 className="font-display text-3xl font-bold tracking-tight text-navy-100 sm:text-4xl">
+          Upload file
+        </h1>
+        <p className="mt-2 text-[15px] text-navy-400">
+          Drop a contract to start your analysis.
+        </p>
+      </div>
 
-      <div className="mt-8 flex flex-col gap-6">
+      <div
+        className="mt-10 flex flex-col gap-6 opacity-0"
+        style={{ animation: "fp-fade-in-up 0.6s ease-out 0.25s forwards" }}
+      >
         <UploadZone onFileSelect={handleFileSelect} />
 
         {file && (
           <>
             <div>
-              <h2 className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <h2 className="mb-3 text-[13px] font-medium uppercase tracking-[0.12em] text-navy-400">
                 Selected file
               </h2>
               <PendingFileRow
@@ -72,21 +78,20 @@ export default function UploadPage() {
                 <button
                   type="button"
                   onClick={simulateUpload}
-                  className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600"
+                  className="mt-4 rounded-lg bg-gold-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-gold-700"
                 >
-                  Upload
+                  Upload &amp; analyze
                 </button>
               )}
             </div>
 
             <div>
-              {/* Show placeholder while uploading, reveal preview when done (or change logic as desired) */}
-              <DocumentPreview 
-                fileName={file.name} 
+              <DocumentPreview
+                fileName={file.name}
                 fileType={file.type}
                 fileUrl={previewUrl}
                 file={file}
-                placeholder={status === "pending" || status === "uploading"} 
+                placeholder={status === "pending" || status === "uploading"}
               />
             </div>
           </>
