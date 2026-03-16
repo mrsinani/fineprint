@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { Upload } from "lucide-react";
 
 export interface UploadZoneProps {
   onFileSelect: (file: File) => void;
@@ -59,22 +60,20 @@ export function UploadZone({
       }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/80 px-6 py-14 transition-colors hover:border-slate-400 hover:bg-slate-100/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800/30 dark:hover:border-slate-500 dark:hover:bg-slate-800/50"
+      className="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-blue-600 bg-navy-900/50 px-6 py-16 transition-colors duration-200 hover:border-blue-400 hover:bg-blue-100/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
       aria-label="Click to upload or drag and drop"
     >
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-slate-200 text-slate-500 dark:bg-slate-600 dark:text-slate-400" aria-hidden>
-        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
+      <div
+        className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600/10 text-blue-600 transition-colors duration-200 group-hover:bg-blue-100 group-hover:text-blue-700"
+        aria-hidden
+      >
+        <Upload size={24} strokeWidth={1.75} aria-hidden />
       </div>
-      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-        Click to upload or drag and drop
+      <p className="text-sm font-medium text-navy-200">
+        Click to upload{" "}
+        <span className="text-navy-500">or drag and drop</span>
       </p>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        {maxSize}
-      </p>
+      <p className="mt-1.5 text-[12px] text-navy-500">{maxSize}</p>
       <input
         ref={inputRef}
         type="file"
@@ -87,4 +86,3 @@ export function UploadZone({
     </div>
   );
 }
-

@@ -1,39 +1,68 @@
+import { MoreHorizontal } from "lucide-react";
+
 export interface DocumentCardProps {
-  /** Optional unique id for the card (for accessibility). */
   id?: string;
   title: string;
-  uploadedAt: string;
-  manager?: string;
-  team?: string;
+  fileName?: string;
+  lastOpened?: string;
+  fileType?: string;
   pages?: number;
   createdAt: string;
+  uploadedAt?: string;
+  manager?: string;
+  team?: string;
 }
 
-export function DocumentCard({ id: documentId, title, uploadedAt, manager, team, pages, createdAt }: DocumentCardProps) {
+export function DocumentCard({
+  id: documentId,
+  title,
+  fileName,
+  lastOpened,
+  fileType,
+  pages,
+  createdAt,
+  uploadedAt,
+}: DocumentCardProps) {
   const titleId = documentId ? `doc-title-${documentId}` : undefined;
+  const displayOpened = lastOpened ?? uploadedAt;
+
   return (
     <article
-      className="flex min-w-[280px] max-w-[320px] flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow dark:border-slate-700 dark:bg-slate-900"
+      className="flex min-h-[180px] min-w-[220px] max-w-[240px] flex-col justify-between rounded-xl border border-navy-700 bg-white p-4 transition-shadow duration-200 hover:shadow-md"
       aria-labelledby={titleId}
     >
-      <h3 id={titleId} className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-        {title}
-      </h3>
-      <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-        <div>
-          <dt className="sr-only">Uploaded</dt>
-          <dd>Uploaded: {uploadedAt}</dd>
+      <div>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[11px] text-navy-500">
+            {displayOpened && <>Last opened: {displayOpened}</>}
+          </p>
+          <button
+            type="button"
+            className="shrink-0 rounded-md p-0.5 text-navy-500 transition-colors hover:text-navy-300"
+            aria-label="Document options"
+          >
+            <MoreHorizontal size={16} strokeWidth={2} />
+          </button>
         </div>
-        {manager != null && (
-          <div>
-            <dt className="sr-only">Manager</dt>
-            <dd>Manager: {manager}</dd>
-          </div>
+
+        <h3
+          id={titleId}
+          className="mt-2 truncate text-sm font-bold text-navy-100"
+        >
+          {title}
+        </h3>
+        {fileName && (
+          <p className="mt-0.5 truncate text-[12px] text-navy-500">
+            {fileName}
+          </p>
         )}
-        {team != null && (
+      </div>
+
+      <dl className="mt-4 flex flex-col gap-0.5 text-[11px] text-navy-500">
+        {fileType && (
           <div>
-            <dt className="sr-only">Team</dt>
-            <dd>Team: {team}</dd>
+            <dt className="sr-only">File type</dt>
+            <dd>File type: {fileType}</dd>
           </div>
         )}
         {pages != null && (
@@ -50,4 +79,3 @@ export function DocumentCard({ id: documentId, title, uploadedAt, manager, team,
     </article>
   );
 }
-
