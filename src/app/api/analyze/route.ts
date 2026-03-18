@@ -2,107 +2,122 @@ import { NextRequest, NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { extractText as extractPdfText } from "unpdf";
 
-const SYSTEM_PROMPT = `You are an expert in legally analyzing any sort of document: from rent contracts to terms and conditions and ToS.
-
-Given a piece of text, your task is to do the following:
-1. Generate a plain language summary of the contract, so that the user can understand the overall meaning without reading dense legal text.
-2. Display the most risky clauses from the contract text with explanations, so that the user can understand exactly which parts may disadvantage them. Rank them based on level of risk: 0 being irrelevant, 1 being non-risky, 2 being moderate risky, 3 being highly risky, 4 being avoid at all costs
-3. Derive a risk score from 1 to 10 based on the contract text, so the user can gauge how cautious they must be with the text before signing.
-4. Generate a list of key obligations from the contract text, so that the user can understand what they are responsible for before agreeing.
-
-Once all these steps are performed, format the data EXACTLY in this JSON structure:
-{
-  "summary": "insert text here",
-  "risk_score": number,
-  "obligations": ["1234", "abcde"],
-  "risky_clauses": [["12345", 3], ["67890", 2]]
-}`;
-
+// --- Text Extraction Helper ---
 async function extractText(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
 
   if (file.type === "text/plain") {
     return buffer.toString("utf-8");
   }
-
   if (file.type === "application/pdf") {
-    const { text } = await extractPdfText(new Uint8Array(buffer));
+    const { text } = await extractPdfText(new Uint8Array(buffer), {mergePages: true});
     return text;
   }
-
   if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   }
-
   throw new Error("Unsupported file type. Please use .pdf, .docx, or .txt");
+}
+
+// --- OpenAI Fetch Helper ---
+async function askOpenAI(systemPrompt: string, userText: string, apiKey: string) {
+  console.log("Handling Prompt Message:", systemPrompt)
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini", // Fast, cost-effective model for text processing
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Here is the document text to analyze:\n\n${userText}` },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
+  }
+
+  const data = await response.json();
+  return JSON.parse(data.choices[0].message.content);
 }
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "OpenAI API key is not configured on the server." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "OpenAI API key is not configured." }, { status: 500 });
   }
 
   try {
     const contentType = req.headers.get("content-type") || "";
     let documentText: string;
 
+    // Handle both Text Paste (JSON) and File Upload (FormData)
     if (contentType.includes("application/json")) {
       const { text } = await req.json();
       if (!text || typeof text !== "string" || text.trim().length === 0) {
-        return NextResponse.json(
-          { error: "No text provided." },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "No text provided." }, { status: 400 });
       }
       documentText = text;
     } else {
       const formData = await req.formData();
       const file = formData.get("file") as File | null;
       if (!file) {
-        return NextResponse.json(
-          { error: "No file provided." },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "No file provided." }, { status: 400 });
       }
       documentText = await extractText(file);
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Here is the document text to analyze:\n\n${documentText}`,
-          },
-        ],
-      }),
-    });
+    // 1. THE GATEKEEPER
+    // Checks only the first 3000 characters to verify it's a legal document
+    const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a legal document (e.g., contract, Terms of Service, Privacy Policy, Lease, NDA). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
+    const verification = await askOpenAI(gatekeeperPrompt, documentText.substring(0, 3000), apiKey);
 
-    if (!response.ok) {
-      const errorBody = await response.text();
+    if (!verification.is_legal) {
       return NextResponse.json(
-        { error: `OpenAI API error: ${response.status} ${errorBody}` },
-        { status: 502 }
+        { error: `This doesn't look like a legal document. AI Reason: ${verification.reason}` },
+        { status: 400 }
       );
     }
 
-    const data = await response.json();
-    const parsed = JSON.parse(data.choices[0].message.content);
+    // 2. THE SPECIALIZED AGENTS
+    const summaryPrompt = `You are an expert legal summarizer. Provide a plain language summary so a layperson understands the overall intent. Format EXACTLY in this JSON format: { "summary": "insert summary here" }`;
 
-    return NextResponse.json(parsed);
+    const obligationsPrompt = `You are a legal auditor. Extract a list of the key obligations and responsibilities the user is agreeing to. Format EXACTLY in this JSON format: { "obligations": ["obligation 1", "obligation 2"] }`;
+
+    const riskPrompt = `You are an expert legal auditor protecting the user. Analyze the contract for risky clauses and assign an overall risk score.
+      Risk Scoring Rubric for Clauses:
+      * Level 1 (Standard/Low): Boilerplate clauses, standard industry practice, minimal threat.
+      * Level 2 (Moderate): Favors the company but common. User should be aware, not a dealbreaker.
+      * Level 3 (High): Aggressive clauses stripping normal legal rights or exposing financial risk.
+      * Level 4 (Critical/Avoid): Predatory clauses giving total unchecked power.
+
+      Derive an overall risk_score from 1 to 10 for the entire document.
+      Format EXACTLY in this JSON format: { "risk_score": number, "risky_clauses": [ ["clause text or plain English explanation", severity_level_number] ] }`;
+
+    // 3. RUN IN PARALLEL
+    // Fire all three API calls simultaneously for maximum speed
+    const [summaryData, obligationsData, riskData] = await Promise.all([
+      askOpenAI(summaryPrompt, documentText, apiKey),
+      askOpenAI(obligationsPrompt, documentText, apiKey),
+      askOpenAI(riskPrompt, documentText, apiKey),
+    ]);
+
+    // 4. COMBINE AND RETURN
+    // This perfectly matches the JSON structure your frontend is expecting to render in the <pre> tag
+    return NextResponse.json({
+      summary: summaryData.summary,
+      obligations: obligationsData.obligations,
+      risk_score: riskData.risk_score,
+      risky_clauses: riskData.risky_clauses,
+    });
+
   } catch (error) {
     console.error("Analysis route error:", error);
     return NextResponse.json(
