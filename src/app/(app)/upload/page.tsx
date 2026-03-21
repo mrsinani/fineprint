@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
-import { UploadZone, PendingFileRow } from "@/components/upload";
+import { UploadZone } from "@/components/upload/UploadZone";
+import { PendingFileRow } from "@/components/upload/PendingFileRow";
 
 const DocumentPreview = dynamic(
   () =>
@@ -32,8 +33,13 @@ export default function UploadPage() {
 
   // File state
   const [file, setFile] = useState<File | null>(null);
+  const [analysisFile, setAnalysisFile] = useState<File | null>(null);
   const [fileStatus, setFileStatus] = useState<UploadStatus>("pending");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Tracking PDF Pages
+  const [excludedPages, setExcludedPages] = useState<number[]>([]);
+  const [totalPages, setTotalPages] = useState<number>(0);
 
   // Text state
   const [pastedText, setPastedText] = useState("");
@@ -43,17 +49,48 @@ export default function UploadPage() {
   const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
+    if (!file || file.type !== 'application/pdf') {
+      setAnalysisFile(file);
       return;
     }
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
+    
+    if (excludedPages.length === 0) {
+      setAnalysisFile(file);
+      return;
+    }
+
+    const modifyPdf = async () => {
+      const { PDFDocument } = await import('pdf-lib');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const pages = pdfDoc.getPages();
+      
+      // Your reverse sort is perfect here to prevent index shifting
+      const sortedExcluded = [...excludedPages].sort((a, b) => b - a);
+      
+      for (const pageNum of sortedExcluded) {
+        if (pageNum >= 1 && pageNum <= pages.length) {
+          pdfDoc.removePage(pageNum - 1);
+        }
+      }
+      
+      const modifiedBytes = await pdfDoc.save();
+      
+      const modifiedFile = new File(
+        [modifiedBytes as any], 
+        file.name, 
+        { type: file.type }
+      );
+      
+      setAnalysisFile(modifiedFile);
+    };
+    
+    modifyPdf();
+  }, [excludedPages, file]);
 
   const handleFileSelect = useCallback((selected: File) => {
     setFile(selected);
+    setAnalysisFile(selected);
     setFileStatus("pending");
     setAnalysisResult(null);
   }, []);
@@ -71,7 +108,9 @@ export default function UploadPage() {
   }, [file]);
 
   const canAnalyze =
-    mode === "file" ? fileStatus === "done" : pastedText.trim().length > 0;
+    mode === "file"
+      ? fileStatus === "done" && !(totalPages > 0 && excludedPages.length === totalPages)
+      : pastedText.trim().length > 0;
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -81,9 +120,9 @@ export default function UploadPage() {
       let response: Response;
 
       if (mode === "file") {
-        if (!file) return;
+        if (!analysisFile) return;
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", analysisFile);
         response = await fetch("/api/analyze", {
           method: "POST",
           body: formData,
@@ -213,6 +252,8 @@ export default function UploadPage() {
                     fileUrl={previewUrl}
                     file={file}
                     placeholder={fileStatus === "pending" || fileStatus === "uploading"}
+                    onExcludedPagesChange={setExcludedPages}
+                    onNumPagesChange={setTotalPages}
                   />
                 </div>
               </>
