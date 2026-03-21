@@ -179,7 +179,9 @@ export default function UploadPage() {
       >
         {mode === "file" ? (
           <>
+          {!file && 
             <UploadZone onFileSelect={handleFileSelect} />
+          }
 
             {file && (
               <>
