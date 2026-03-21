@@ -1,14 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
-import { UploadZone, PendingFileRow } from "@/components/upload";
-
-const DocumentPreview = dynamic(
-  () =>
-    import("@/components/upload/DocumentPreview").then((m) => m.DocumentPreview),
-  { ssr: false }
-);
+import * as mammoth from "mammoth";
+import { UploadZone, PendingFileRow, DocumentPreview } from "@/components/upload";
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
@@ -19,7 +13,12 @@ interface RiskyClause {
   severity: number;
 }
 
-
+interface AnalysisResult {
+  summary: string;
+  obligations: string[];
+  risky_clauses: RiskyClause[];
+  overall_risk_score?: number; // Calculated on the frontend
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -40,7 +39,7 @@ export default function UploadPage() {
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   useEffect(() => {
     if (!file) {
@@ -70,44 +69,87 @@ export default function UploadPage() {
     setTimeout(() => setFileStatus("done"), 1500);
   }, [file]);
 
-  const canAnalyze =
-    mode === "file" ? fileStatus === "done" : pastedText.trim().length > 0;
+  const canAnalyze = mode === "file" ? fileStatus === "done" : pastedText.trim().length > 0;
+
+  // --- Text Extraction Helper ---
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    if (file.type === "text/plain") return await file.text();
+    if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    }
+    throw new Error("Unsupported file type for text extraction. Please use .txt or .docx");
+  };
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
 
     try {
-      let response: Response;
-
+      let documentText = "";
+      
+      // Determine text source based on current mode
       if (mode === "file") {
         if (!file) return;
-        const formData = new FormData();
-        formData.append("file", file);
-        response = await fetch("/api/analyze", {
-          method: "POST",
-          body: formData,
-        });
+        documentText = await extractTextFromFile(file);
       } else {
-        response = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: pastedText }),
-        });
+        if (!pastedText.trim()) return;
+        documentText = pastedText;
       }
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert legal analyzer.
+Find any risky clauses in the text that disadvantage the user. 
+For each clause found, assign a severity score from 1 to 4 using this STRICT rubric:
+1 (Low Risk): Standard annoyances, minor fees, standard mutual indemnification.
+2 (Moderate Risk): Automatic renewals without notice, one-sided cancellation fees.
+3 (High Risk): Forced arbitration, class action waivers, aggressive data selling.
+4 (Extreme Risk): Unilateral rights to change terms without notice, waiving fundamental legal rights, predatory financial penalties.
+
+Return the data EXACTLY in this JSON format:
+{
+  "summary": "plain language summary",
+  "obligations": ["list of user duties"],
+  "risky_clauses": [
+    {
+      "quote": "exact text from contract",
+      "explanation": "why it's bad",
+      "severity": 3
+    }
+  ]
+}`
+            },
+            {
+              role: "user",
+              content: `Here is the document text to analyze:\n\n${documentText}`
+            }
+          ]
+        })
+      });
+
+      if (!response.ok) throw new Error(`OpenAI API error: ${response.statusText}`);
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server error: ${response.status}`);
-      }
+      const parsedContent: AnalysisResult = JSON.parse(data.choices[0].message.content);
       
       // --- SEVERITY MATH CALCULATION ---
       let calculatedScore = 1; // Base score (safe)
-      console.log("Data:", data)
-      if (data.risky_clauses && data.risky_clauses.length > 0) {
-        const maxSeverity = Math.max(...data.risky_clauses.map((c: any) => c[1]));
-        const clauseCount = data.risky_clauses.length;
+      
+      if (parsedContent.risky_clauses && parsedContent.risky_clauses.length > 0) {
+        const maxSeverity = Math.max(...parsedContent.risky_clauses.map(c => c.severity));
+        const clauseCount = parsedContent.risky_clauses.length;
 
         // Base score on the absolute worst clause found
         if (maxSeverity === 4) calculatedScore = 8;
@@ -123,8 +165,9 @@ export default function UploadPage() {
         calculatedScore = Math.min(Math.round(calculatedScore), 10);
       }
 
-      data.overall_risk_score = calculatedScore;
-      setAnalysisResult(data);
+      parsedContent.overall_risk_score = calculatedScore;
+      setAnalysisResult(parsedContent);
+
     } catch (error) {
       console.error("Analysis failed:", error);
       alert(error instanceof Error ? error.message : "Failed to analyze document.");
@@ -235,7 +278,7 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* --- REPLACED RAW JSON WITH STYLED RESULTS --- */}
+      {/* --- RESULTS DASHBOARD --- */}
       {analysisResult && (
         <div 
           className="mt-12 flex flex-col gap-8 opacity-0"
@@ -276,8 +319,8 @@ export default function UploadPage() {
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Risky Clauses Detected</h3>
             <div className="space-y-4">
               {Array.isArray(analysisResult.risky_clauses) && analysisResult.risky_clauses.length > 0 ? (
-                analysisResult.risky_clauses.map((clause: any, i: number) => {
-                  const level = clause[1];
+                analysisResult.risky_clauses.map((clause: RiskyClause, i: number) => {
+                  const level = clause.severity;
                   let badgeColors = "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
                   let levelText = "Standard";
                   
@@ -286,13 +329,18 @@ export default function UploadPage() {
                   else if (level === 2) { badgeColors = "bg-amber-500/10 text-amber-400 ring-amber-500/20"; levelText = "Moderate"; }
 
                   return (
-                    <div key={i} className="flex flex-col gap-2 sm:flex-row sm:gap-4 rounded-lg bg-navy-900 p-4 border border-navy-800">
+                    <div key={i} className="flex flex-col gap-3 sm:flex-row sm:gap-4 rounded-lg bg-navy-900 p-5 border border-navy-800">
                       <div className="flex-shrink-0 pt-0.5">
                         <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${badgeColors}`}>
                           Lvl {level}: {levelText}
                         </span>
                       </div>
-                      <p className="text-sm text-navy-200 mt-1 sm:mt-0 leading-relaxed">{clause[0]}</p>
+                      <div className="flex flex-col gap-2">
+                        <span className="text-sm text-navy-300 italic border-l-2 border-navy-700 pl-3">"{clause.quote}"</span>
+                        <p className="text-sm text-navy-100 leading-relaxed mt-1">
+                          <span className="font-semibold">Why it matters:</span> {clause.explanation}
+                        </p>
+                      </div>
                     </div>
                   );
                 })
