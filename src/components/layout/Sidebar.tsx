@@ -12,8 +12,8 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/upload", label: "Upload new", icon: Upload },
-  { href: "/documents", label: "My documents", icon: FileText },
+  { href: "/upload", label: "Upload New", icon: Upload },
+  { href: "/documents", label: "My Documents", icon: FileText },
 ] as const;
 
 const secondaryItems = [
