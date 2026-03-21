@@ -74,7 +74,6 @@ export async function POST(req: NextRequest) {
       documentText = await extractText(file);
     }
 
-    // 1. THE GATEKEEPER
     // Checks only the first 3000 characters to verify it's a legal document
     const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a legal document (e.g., contract, Terms of Service, Privacy Policy, Lease, NDA). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
     const verification = await askOpenAI(gatekeeperPrompt, documentText.substring(0, 3000), apiKey);
@@ -86,7 +85,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. THE SPECIALIZED AGENTS
     const summaryPrompt = `You are an expert legal summarizer. Provide a plain language summary so a layperson understands the overall intent. Format EXACTLY in this JSON format: { "summary": "insert summary here" }`;
 
     const obligationsPrompt = `You are a legal auditor. Extract a list of the key obligations and responsibilities the user is agreeing to. Format EXACTLY in this JSON format: { "obligations": ["obligation 1", "obligation 2"] }`;
