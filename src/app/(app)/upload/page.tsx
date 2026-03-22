@@ -1,7 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
-import { UploadZone, PendingFileRow, DocumentPreview } from "@/components/upload";
+import { UploadZone, PendingFileRow } from "@/components/upload";
+
+const DocumentPreview = dynamic(
+  () =>
+    import("@/components/upload/DocumentPreview").then((m) => m.DocumentPreview),
+  { ssr: false }
+);
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
