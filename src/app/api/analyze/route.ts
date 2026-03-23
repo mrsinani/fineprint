@@ -124,9 +124,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const summaryPrompt = `You are an expert legal summarizer. Provide a plain language summary so a layperson understands the overall intent. Format EXACTLY in this JSON format: { "summary": "insert summary here" }`;
-
-    const obligationsPrompt = `You are a legal auditor. Extract a list of the key obligations and responsibilities the user is agreeing to. Format EXACTLY in this JSON format: { "obligations": ["obligation 1", "obligation 2"] }`;
+    const summaryPrompt = `You are an expert legal summarizer. Break down the contract into 3-5 thematic sections, each with a clear title and 4-8 bullet points explaining key aspects in plain language a layperson can understand.
+      Format EXACTLY in this JSON format: { "sections": [ { "title": "Section Title", "points": ["point 1", "point 2"] } ] }`;
 
     const riskPrompt = `You are an expert legal auditor protecting the user. Analyze the contract for risky clauses and assign an overall risk score.
       Risk Scoring Rubric for Clauses:
@@ -138,24 +137,25 @@ export async function POST(req: NextRequest) {
       Derive an overall risk_score from 1 to 10 for the entire document.
       Format EXACTLY in this JSON format: { "risk_score": number, "risky_clauses": [ ["clause text or plain English explanation", severity_level_number] ] }`;
 
+    const actionItemsPrompt = `You are a legal advisor helping a user review a contract. Identify specific, concrete action items the user should take before signing or in response to the contract terms. Group them into 2-4 categories with clear titles.
+      Format EXACTLY in this JSON format: { "sections": [ { "title": "Category Title", "points": ["action item 1", "action item 2"] } ] }`;
+
     // Truncate to ~300k chars (~100 pages) to stay within context limits
     const truncatedText = documentText.slice(0, 300000);
 
     // 3. RUN IN PARALLEL
-    // Fire all three API calls simultaneously for maximum speed
-    const [summaryData, obligationsData, riskData] = await Promise.all([
+    const [summaryData, riskData, actionItemsData] = await Promise.all([
       askOpenAI(summaryPrompt, truncatedText, apiKey),
-      askOpenAI(obligationsPrompt, truncatedText, apiKey),
       askOpenAI(riskPrompt, truncatedText, apiKey),
+      askOpenAI(actionItemsPrompt, truncatedText, apiKey),
     ]);
 
     // 4. COMBINE AND RETURN
-    // This perfectly matches the JSON structure your frontend is expecting to render in the <pre> tag
     return NextResponse.json({
-      summary: summaryData.summary,
-      obligations: obligationsData.obligations,
+      summary_sections: summaryData.sections,
       risk_score: riskData.risk_score,
       risky_clauses: riskData.risky_clauses,
+      action_items: actionItemsData.sections,
     });
   } catch (error) {
     console.error("Analysis route error:", error);
