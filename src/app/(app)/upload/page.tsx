@@ -131,21 +131,14 @@ export default function UploadPage() {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
 
-      // --- SEVERITY MATH CALCULATION ---
-      let calculatedScore = 1;
-      if (data.risky_clauses && data.risky_clauses.length > 0) {
-        const maxSeverity = Math.max(...data.risky_clauses.map((c: any) => c[1]));
-        const clauseCount = data.risky_clauses.length;
-        if (maxSeverity === 4) calculatedScore = 8;
-        else if (maxSeverity === 3) calculatedScore = 5;
-        else if (maxSeverity === 2) calculatedScore = 3;
-        else if (maxSeverity === 1) calculatedScore = 2;
-        const volumePenalty = Math.min(clauseCount * 0.5, 2);
-        calculatedScore += volumePenalty;
-        calculatedScore = Math.min(Math.round(calculatedScore), 10);
-      }
+      // --- RISK SCORE (0–100) ---
+      const clauses: any[] = data.risk_analysis?.clauses ?? [];
+      const highCount = clauses.filter((c: any) => c.severity === "HIGH").length;
+      const medCount  = clauses.filter((c: any) => c.severity === "MEDIUM").length;
+      const lowCount  = clauses.filter((c: any) => c.severity === "LOW").length;
+      const calculatedScore = Math.min(highCount * 18 + medCount * 7 + lowCount * 2, 100);
 
-      // Store in localStorage and navigate to result page
+      // Store metadata in localStorage and navigate to result page
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const stored = {
         id,
@@ -156,6 +149,22 @@ export default function UploadPage() {
         overall_risk_score: calculatedScore,
       };
       localStorage.setItem(`fp_doc_${id}`, JSON.stringify(stored));
+
+      // Store PDF as base64 for live heatmap preview (best-effort, may fail for large files)
+      if (mode === "file" && file && file.type === "application/pdf") {
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload  = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          localStorage.setItem(`fp_pdf_${id}`, base64);
+        } catch {
+          // Non-fatal: heatmap will show text fallback
+        }
+      }
+
       router.push(`/documents/${id}`);
     } catch (error) {
       console.error("Analysis failed:", error);

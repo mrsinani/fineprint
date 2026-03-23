@@ -31,7 +31,6 @@ async function askOpenAI(
   userText: string,
   apiKey: string,
 ) {
-  console.log("Handling Prompt Message:", systemPrompt);
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -85,7 +84,6 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get("content-type") || "";
     let documentText: string;
 
-    // Handle both Text Paste (JSON) and File Upload (FormData)
     if (contentType.includes("application/json")) {
       const { text } = await req.json();
       if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -107,7 +105,7 @@ export async function POST(req: NextRequest) {
       documentText = await extractText(file);
     }
 
-    // Checks only the first 3000 characters to verify it's a legal document
+    // Gatekeeper: verify this is a legal document
     const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a legal document (e.g., contract, Terms of Service, Privacy Policy, Lease, NDA). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
     const verification = await askOpenAI(
       gatekeeperPrompt,
@@ -124,38 +122,94 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const summaryPrompt = `You are an expert legal summarizer. Break down the contract into 3-5 thematic sections, each with a clear title and 4-8 bullet points explaining key aspects in plain language a layperson can understand.
-      Format EXACTLY in this JSON format: { "sections": [ { "title": "Section Title", "points": ["point 1", "point 2"] } ] }`;
+    const summaryPrompt = `You are an expert legal summarizer. Analyze this contract and extract:
+1. A 1-2 sentence plain-English overview of what this contract is about
+2. The parties involved — identify who "you" (the user/signer) are and who the other party is
+3. 4-8 key terms or sections with clear plain-English explanations and an icon hint
+4. 4-6 plain English bullet points summarizing what this contract means for the user
 
-    const riskPrompt = `You are an expert legal auditor protecting the user. Analyze the contract for risky clauses and assign an overall risk score.
-      Risk Scoring Rubric for Clauses:
-      * Level 1 (Standard/Low): Boilerplate clauses, standard industry practice, minimal threat.
-      * Level 2 (Moderate): Favors the company but common. User should be aware, not a dealbreaker.
-      * Level 3 (High): Aggressive clauses stripping normal legal rights or exposing financial risk.
-      * Level 4 (Critical/Avoid): Predatory clauses giving total unchecked power.
+For icon, choose the single best match from: calendar, dollar, file, users, shield, clock
 
-      Derive an overall risk_score from 1 to 10 for the entire document.
-      Format EXACTLY in this JSON format: { "risk_score": number, "risky_clauses": [ ["clause text or plain English explanation", severity_level_number] ] }`;
+Format EXACTLY as JSON:
+{
+  "overview": "1-2 sentence plain English description of the contract",
+  "parties": [
+    { "role": "Service Provider (You)", "name": "Actual company or person name" },
+    { "role": "Client", "name": "Actual company or person name" }
+  ],
+  "key_terms": [
+    { "title": "Contract Duration", "description": "Plain English explanation", "icon": "calendar" }
+  ],
+  "plain_english": ["bullet point 1", "bullet point 2"]
+}`;
 
-    const actionItemsPrompt = `You are a legal advisor helping a user review a contract. Identify specific, concrete action items the user should take before signing or in response to the contract terms. Group them into 2-4 categories with clear titles.
-      Format EXACTLY in this JSON format: { "sections": [ { "title": "Category Title", "points": ["action item 1", "action item 2"] } ] }`;
+    const riskPrompt = `You are an expert legal auditor protecting the user. Identify every significant clause and assess its risk to the user.
 
-    // Truncate to ~300k chars (~100 pages) to stay within context limits
+For each clause:
+- Extract a short, meaningful title
+- Assign severity: HIGH (aggressive, strips rights, major financial risk), MEDIUM (favors other party, user should be aware), or LOW (standard/boilerplate)
+- Quote the relevant sentence(s) directly from the document (verbatim, max 2-3 sentences)
+- Explain the risk in plain English
+- Give a specific, actionable recommendation
+- Note the section reference if identifiable (e.g. "Section 8.2")
+
+Sort by severity descending (HIGH first).
+
+Format EXACTLY as JSON:
+{
+  "clauses": [
+    {
+      "title": "Termination Clause",
+      "severity": "HIGH",
+      "quote": "Either party may terminate this Agreement at any time with 7 days written notice.",
+      "description": "The contract can be terminated with only 7 days notice, which is far shorter than industry standard (30 days), leaving you little time to transition.",
+      "recommendation": "Negotiate for a minimum 30-day notice period to allow adequate time for transition.",
+      "section": "Section 8.2"
+    }
+  ]
+}`;
+
+    const actionItemsPrompt = `You are a legal advisor reviewing a contract on behalf of the user. Identify 5-10 specific, concrete action items the user should take before signing or in response to this contract.
+
+For each action item provide:
+- A clear, actionable title (start with a verb)
+- A brief description of why this matters
+- Priority: HIGH (must do before signing), MEDIUM (important but not blocking), or LOW (nice to have)
+- Category: one of Signature, Insurance, Legal, Financial, Administrative, Negotiation, Team, Meeting
+
+Sort by priority (HIGH first), then by importance within each priority.
+
+Format EXACTLY as JSON:
+{
+  "items": [
+    {
+      "title": "Review and sign contract",
+      "description": "Sign the agreement and return to the other party within the required timeframe.",
+      "priority": "HIGH",
+      "category": "Signature"
+    }
+  ]
+}`;
+
     const truncatedText = documentText.slice(0, 300000);
 
-    // 3. RUN IN PARALLEL
     const [summaryData, riskData, actionItemsData] = await Promise.all([
       askOpenAI(summaryPrompt, truncatedText, apiKey),
       askOpenAI(riskPrompt, truncatedText, apiKey),
       askOpenAI(actionItemsPrompt, truncatedText, apiKey),
     ]);
 
-    // 4. COMBINE AND RETURN
     return NextResponse.json({
-      summary_sections: summaryData.sections,
-      risk_score: riskData.risk_score,
-      risky_clauses: riskData.risky_clauses,
-      action_items: actionItemsData.sections,
+      summary: {
+        overview: summaryData.overview,
+        parties: summaryData.parties ?? [],
+        key_terms: summaryData.key_terms ?? [],
+        plain_english: summaryData.plain_english ?? [],
+      },
+      risk_analysis: {
+        clauses: riskData.clauses ?? [],
+      },
+      action_items: actionItemsData.items ?? [],
     });
   } catch (error) {
     console.error("Analysis route error:", error);
