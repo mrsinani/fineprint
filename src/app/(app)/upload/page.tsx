@@ -1,8 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
-import { UploadZone, PendingFileRow, DocumentPreview } from "@/components/upload";
-import { PDFDocument } from 'pdf-lib';
+import { UploadZone } from "@/components/upload/UploadZone";
+import { PendingFileRow } from "@/components/upload/PendingFileRow";
+
+const DocumentPreview = dynamic(
+  () =>
+    import("@/components/upload/DocumentPreview").then((m) => m.DocumentPreview),
+  { ssr: false }
+);
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
@@ -53,7 +60,7 @@ export default function UploadPage() {
     }
 
     const modifyPdf = async () => {
-      // Assuming you have imported PDFDocument from 'pdf-lib'
+      const { PDFDocument } = await import('pdf-lib');
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const pages = pdfDoc.getPages();
