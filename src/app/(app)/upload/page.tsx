@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { PendingFileRow } from "@/components/upload/PendingFileRow";
