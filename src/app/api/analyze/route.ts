@@ -39,7 +39,7 @@ async function askOpenAI(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini", // Fast, cost-effective model for text processing
+      model: "gpt-4o",
       response_format: { type: "json_object" },
       max_tokens: 16384,
       messages: [
@@ -68,9 +68,7 @@ async function askOpenAI(
       "raw:",
       raw?.slice(0, 500),
     );
-    throw new Error(
-      "AI returned an incomplete response. The document may be too long — try excluding some pages.",
-    );
+    throw new Error("AI returned an incomplete response. Please try again.");
   }
 }
 
@@ -140,12 +138,15 @@ export async function POST(req: NextRequest) {
       Derive an overall risk_score from 1 to 10 for the entire document.
       Format EXACTLY in this JSON format: { "risk_score": number, "risky_clauses": [ ["clause text or plain English explanation", severity_level_number] ] }`;
 
+    // Truncate to ~300k chars (~100 pages) to stay within context limits
+    const truncatedText = documentText.slice(0, 300000);
+
     // 3. RUN IN PARALLEL
     // Fire all three API calls simultaneously for maximum speed
     const [summaryData, obligationsData, riskData] = await Promise.all([
-      askOpenAI(summaryPrompt, documentText, apiKey),
-      askOpenAI(obligationsPrompt, documentText, apiKey),
-      askOpenAI(riskPrompt, documentText, apiKey),
+      askOpenAI(summaryPrompt, truncatedText, apiKey),
+      askOpenAI(obligationsPrompt, truncatedText, apiKey),
+      askOpenAI(riskPrompt, truncatedText, apiKey),
     ]);
 
     // 4. COMBINE AND RETURN
