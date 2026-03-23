@@ -34,6 +34,7 @@ async function askOpenAI(systemPrompt: string, userText: string, apiKey: string)
     body: JSON.stringify({
       model: "gpt-4o-mini", // Fast, cost-effective model for text processing
       response_format: { type: "json_object" },
+      max_tokens: 4096,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Here is the document text to analyze:\n\n${userText}` },
@@ -47,7 +48,13 @@ async function askOpenAI(systemPrompt: string, userText: string, apiKey: string)
   }
 
   const data = await response.json();
-  return JSON.parse(data.choices[0].message.content);
+  const raw = data.choices[0].message.content;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.error("Failed to parse OpenAI response. finish_reason:", data.choices[0].finish_reason, "raw:", raw?.slice(0, 500));
+    throw new Error("AI returned an incomplete response. The document may be too long — try excluding some pages.");
+  }
 }
 
 export async function POST(req: NextRequest) {
