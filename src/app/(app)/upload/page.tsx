@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
-import { UploadZone, PendingFileRow } from "@/components/upload";
+import { UploadZone } from "@/components/upload/UploadZone";
+import { PendingFileRow } from "@/components/upload/PendingFileRow";
 
 const DocumentPreview = dynamic(
   () =>
@@ -12,6 +13,14 @@ const DocumentPreview = dynamic(
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
+
+interface RiskyClause {
+  quote: string;
+  explanation: string;
+  severity: number;
+}
+
+
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -24,28 +33,64 @@ export default function UploadPage() {
 
   // File state
   const [file, setFile] = useState<File | null>(null);
+  const [analysisFile, setAnalysisFile] = useState<File | null>(null);
   const [fileStatus, setFileStatus] = useState<UploadStatus>("pending");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Tracking PDF Pages
+  const [excludedPages, setExcludedPages] = useState<number[]>([]);
+  const [totalPages, setTotalPages] = useState<number>(0);
 
   // Text state
   const [pastedText, setPastedText] = useState("");
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
+    if (!file || file.type !== 'application/pdf') {
+      setAnalysisFile(file);
       return;
     }
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
+    
+    if (excludedPages.length === 0) {
+      setAnalysisFile(file);
+      return;
+    }
+
+    const modifyPdf = async () => {
+      const { PDFDocument } = await import('pdf-lib');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const pages = pdfDoc.getPages();
+      
+      // Your reverse sort is perfect here to prevent index shifting
+      const sortedExcluded = [...excludedPages].sort((a, b) => b - a);
+      
+      for (const pageNum of sortedExcluded) {
+        if (pageNum >= 1 && pageNum <= pages.length) {
+          pdfDoc.removePage(pageNum - 1);
+        }
+      }
+      
+      const modifiedBytes = await pdfDoc.save();
+      
+      const modifiedFile = new File(
+        [modifiedBytes as any], 
+        file.name, 
+        { type: file.type }
+      );
+      
+      setAnalysisFile(modifiedFile);
+    };
+    
+    modifyPdf();
+  }, [excludedPages, file]);
 
   const handleFileSelect = useCallback((selected: File) => {
     setFile(selected);
+    setAnalysisFile(selected);
     setFileStatus("pending");
     setAnalysisResult(null);
   }, []);
@@ -63,7 +108,9 @@ export default function UploadPage() {
   }, [file]);
 
   const canAnalyze =
-    mode === "file" ? fileStatus === "done" : pastedText.trim().length > 0;
+    mode === "file"
+      ? fileStatus === "done" && !(totalPages > 0 && excludedPages.length === totalPages)
+      : pastedText.trim().length > 0;
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -73,9 +120,9 @@ export default function UploadPage() {
       let response: Response;
 
       if (mode === "file") {
-        if (!file) return;
+        if (!analysisFile) return;
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", analysisFile);
         response = await fetch("/api/analyze", {
           method: "POST",
           body: formData,
@@ -93,7 +140,29 @@ export default function UploadPage() {
       if (!response.ok) {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
+      
+      // --- SEVERITY MATH CALCULATION ---
+      let calculatedScore = 1; // Base score (safe)
+      console.log("Data:", data)
+      if (data.risky_clauses && data.risky_clauses.length > 0) {
+        const maxSeverity = Math.max(...data.risky_clauses.map((c: any) => c[1]));
+        const clauseCount = data.risky_clauses.length;
 
+        // Base score on the absolute worst clause found
+        if (maxSeverity === 4) calculatedScore = 8;
+        else if (maxSeverity === 3) calculatedScore = 5;
+        else if (maxSeverity === 2) calculatedScore = 3;
+        else if (maxSeverity === 1) calculatedScore = 2;
+
+        // Add volume penalty (death by a thousand papercuts)
+        const volumePenalty = Math.min(clauseCount * 0.5, 2); // Max +2 points
+        calculatedScore += volumePenalty;
+        
+        // Cap at 10 and round
+        calculatedScore = Math.min(Math.round(calculatedScore), 10);
+      }
+
+      data.overall_risk_score = calculatedScore;
       setAnalysisResult(data);
     } catch (error) {
       console.error("Analysis failed:", error);
@@ -109,7 +178,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-12">
+    <div className="mx-auto max-w-3xl px-8 py-12 pb-32">
       <div
         className="opacity-0"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.1s forwards" }}
@@ -149,7 +218,9 @@ export default function UploadPage() {
       >
         {mode === "file" ? (
           <>
+          {!file && 
             <UploadZone onFileSelect={handleFileSelect} />
+          }
 
             {file && (
               <>
@@ -181,6 +252,8 @@ export default function UploadPage() {
                     fileUrl={previewUrl}
                     file={file}
                     placeholder={fileStatus === "pending" || fileStatus === "uploading"}
+                    onExcludedPagesChange={setExcludedPages}
+                    onNumPagesChange={setTotalPages}
                   />
                 </div>
               </>
@@ -205,10 +278,72 @@ export default function UploadPage() {
         )}
       </div>
 
+      {/* --- REPLACED RAW JSON WITH STYLED RESULTS --- */}
       {analysisResult && (
-        <div className="mt-8 rounded-xl bg-navy-100 p-6 text-sm text-green-400 overflow-x-auto">
-          <h3 className="text-white font-bold mb-4">Analysis Result (Raw JSON)</h3>
-          <pre>{JSON.stringify(analysisResult, null, 2)}</pre>
+        <div 
+          className="mt-12 flex flex-col gap-8 opacity-0"
+          style={{ animation: "fp-fade-in-up 0.6s ease-out 0s forwards" }}
+        >
+          <div className="flex items-center justify-between border-b border-navy-700 pb-4">
+            <h2 className="font-display text-2xl font-bold tracking-tight text-navy-100">
+              Analysis Results
+            </h2>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-navy-400 uppercase tracking-wider">Risk Score</span>
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white shadow-lg ${
+                Number(analysisResult.overall_risk_score) > 7 ? 'bg-red-500' : Number(analysisResult.overall_risk_score) > 4 ? 'bg-orange-500' : 'bg-emerald-500'
+              }`}>
+                {analysisResult.overall_risk_score}
+              </span>
+            </div>
+          </div>
+
+          {/* Summary Box */}
+          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-navy-400">Plain Language Summary</h3>
+            <p className="text-navy-100 leading-relaxed">{analysisResult.summary}</p>
+          </div>
+
+          {/* Obligations Box */}
+          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Key Obligations</h3>
+            <ul className="list-inside list-disc space-y-2 text-navy-100">
+              {Array.isArray(analysisResult.obligations) ? analysisResult.obligations.map((ob: string, i: number) => (
+                <li key={i}>{ob}</li>
+              )) : <li>No specific obligations detected.</li>}
+            </ul>
+          </div>
+
+          {/* Risky Clauses Box */}
+          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Risky Clauses Detected</h3>
+            <div className="space-y-4">
+              {Array.isArray(analysisResult.risky_clauses) && analysisResult.risky_clauses.length > 0 ? (
+                analysisResult.risky_clauses.map((clause: any, i: number) => {
+                  const level = clause[1];
+                  let badgeColors = "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
+                  let levelText = "Standard";
+                  
+                  if (level === 4) { badgeColors = "bg-red-500/10 text-red-400 ring-red-500/20"; levelText = "Critical"; }
+                  else if (level === 3) { badgeColors = "bg-orange-500/10 text-orange-400 ring-orange-500/20"; levelText = "High Risk"; }
+                  else if (level === 2) { badgeColors = "bg-amber-500/10 text-amber-400 ring-amber-500/20"; levelText = "Moderate"; }
+
+                  return (
+                    <div key={i} className="flex flex-col gap-2 sm:flex-row sm:gap-4 rounded-lg bg-navy-900 p-4 border border-navy-800">
+                      <div className="flex-shrink-0 pt-0.5">
+                        <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${badgeColors}`}>
+                          Lvl {level}: {levelText}
+                        </span>
+                      </div>
+                      <p className="text-sm text-navy-200 mt-1 sm:mt-0 leading-relaxed">{clause[0]}</p>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-navy-400">No significant risks detected in this document.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

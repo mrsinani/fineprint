@@ -16,10 +16,10 @@ export function RiskAnalysisCard() {
       </div>
 
       <h2 className="text-sm font-bold text-navy-100">
-        Analyze new contract
+        Upload
       </h2>
       <p className="mt-1 text-[12px] leading-relaxed text-navy-400">
-        Upload any contract for a plain English summary and risk analysis.
+        Upload a legal document for a plain English summary and risk score.
       </p>
 
       <div className="mt-3 flex justify-end">

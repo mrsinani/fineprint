@@ -10,7 +10,7 @@ export default function DashboardPage() {
         className="font-display text-3xl font-bold tracking-tight text-navy-50 opacity-0 sm:text-4xl"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.1s forwards" }}
       >
-        My dashboard
+        My Dashboard
       </h1>
 
       <div

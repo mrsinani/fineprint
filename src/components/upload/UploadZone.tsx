@@ -11,7 +11,7 @@ export interface UploadZoneProps {
 }
 
 const DEFAULT_ACCEPT = ".pdf,.docx,.txt";
-const DEFAULT_MAX = "PDF, DOCX or TXT (max. 475 MB)";
+const DEFAULT_MAX = "PDF (preferred), DOCX or TXT (max. 50 MB)";
 
 export function UploadZone({
   onFileSelect,
