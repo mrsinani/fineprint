@@ -34,7 +34,7 @@ async function askOpenAI(systemPrompt: string, userText: string, apiKey: string)
     body: JSON.stringify({
       model: "gpt-4o-mini", // Fast, cost-effective model for text processing
       response_format: { type: "json_object" },
-      max_tokens: 4096,
+      max_tokens: 40000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Here is the document text to analyze:\n\n${userText}` },
