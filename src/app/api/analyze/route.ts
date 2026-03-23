@@ -30,46 +30,51 @@ async function askOpenAI(
   systemPrompt: string,
   userText: string,
   apiKey: string,
-) {
-  console.log("Handling Prompt Message:", systemPrompt);
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-      max_tokens: 16384,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Here is the document text to analyze:\n\n${userText}`,
-        },
-      ],
-    }),
-  });
+  retries = 2,
+): Promise<Record<string, unknown>> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        max_tokens: 16384,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Here is the document text to analyze:\n\n${userText}`,
+          },
+        ],
+      }),
+    });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
-  }
+    if (!response.ok) {
+      const errorBody = await response.text();
+      if (attempt < retries) continue;
+      throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
+    }
 
-  const data = await response.json();
-  const raw = data.choices[0].message.content;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    console.error(
-      "Failed to parse OpenAI response. finish_reason:",
-      data.choices[0].finish_reason,
-      "raw:",
-      raw?.slice(0, 500),
-    );
-    throw new Error("AI returned an incomplete response. Please try again.");
+    const data = await response.json();
+    const raw = data.choices[0].message.content;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      console.error(
+        `Failed to parse OpenAI response (attempt ${attempt + 1}). finish_reason:`,
+        data.choices[0].finish_reason,
+        "raw:",
+        raw?.slice(0, 500),
+      );
+      if (attempt < retries) continue;
+      throw new Error("AI returned an incomplete response. Please try again.");
+    }
   }
+  throw new Error("AI returned an incomplete response. Please try again.");
 }
 
 export async function POST(req: NextRequest) {
@@ -126,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     const summaryPrompt = `You are an expert legal summarizer. Provide a plain language summary so a layperson understands the overall intent. Format EXACTLY in this JSON format: { "summary": "insert summary here" }`;
 
-    const obligationsPrompt = `You are a legal auditor. Extract a list of the key obligations and responsibilities the user is agreeing to. Format EXACTLY in this JSON format: { "obligations": ["obligation 1", "obligation 2"] }`;
+    const obligationsPrompt = `You are a legal auditor. Extract a list of the key obligations and responsibilities the user is agreeing to. Return at most 20 obligations, each concise (under 25 words). Format EXACTLY in this JSON format: { "obligations": ["obligation 1", "obligation 2"] }`;
 
     const riskPrompt = `You are an expert legal auditor protecting the user. Analyze the contract for risky clauses and assign an overall risk score.
       Risk Scoring Rubric for Clauses:
@@ -135,6 +140,7 @@ export async function POST(req: NextRequest) {
       * Level 3 (High): Aggressive clauses stripping normal legal rights or exposing financial risk.
       * Level 4 (Critical/Avoid): Predatory clauses giving total unchecked power.
 
+      Return only the top 15 most important risky clauses, prioritizing the highest severity ones. Keep each explanation concise (under 30 words).
       Derive an overall risk_score from 1 to 10 for the entire document.
       Format EXACTLY in this JSON format: { "risk_score": number, "risky_clauses": [ ["clause text or plain English explanation", severity_level_number] ] }`;
 
