@@ -15,7 +15,10 @@ async function extractText(file: File): Promise<string> {
     });
     return Array.isArray(text) ? text.join("\n\n") : text;
   }
-  if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+  if (
+    file.type ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   }
@@ -23,8 +26,12 @@ async function extractText(file: File): Promise<string> {
 }
 
 // --- OpenAI Fetch Helper ---
-async function askOpenAI(systemPrompt: string, userText: string, apiKey: string) {
-  console.log("Handling Prompt Message:", systemPrompt)
+async function askOpenAI(
+  systemPrompt: string,
+  userText: string,
+  apiKey: string,
+) {
+  console.log("Handling Prompt Message:", systemPrompt);
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -34,10 +41,13 @@ async function askOpenAI(systemPrompt: string, userText: string, apiKey: string)
     body: JSON.stringify({
       model: "gpt-4o-mini", // Fast, cost-effective model for text processing
       response_format: { type: "json_object" },
-      max_tokens: 40000,
+      max_tokens: 16384,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Here is the document text to analyze:\n\n${userText}` },
+        {
+          role: "user",
+          content: `Here is the document text to analyze:\n\n${userText}`,
+        },
       ],
     }),
   });
@@ -52,15 +62,25 @@ async function askOpenAI(systemPrompt: string, userText: string, apiKey: string)
   try {
     return JSON.parse(raw);
   } catch {
-    console.error("Failed to parse OpenAI response. finish_reason:", data.choices[0].finish_reason, "raw:", raw?.slice(0, 500));
-    throw new Error("AI returned an incomplete response. The document may be too long — try excluding some pages.");
+    console.error(
+      "Failed to parse OpenAI response. finish_reason:",
+      data.choices[0].finish_reason,
+      "raw:",
+      raw?.slice(0, 500),
+    );
+    throw new Error(
+      "AI returned an incomplete response. The document may be too long — try excluding some pages.",
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "OpenAI API key is not configured." }, { status: 500 });
+    return NextResponse.json(
+      { error: "OpenAI API key is not configured." },
+      { status: 500 },
+    );
   }
 
   try {
@@ -71,26 +91,38 @@ export async function POST(req: NextRequest) {
     if (contentType.includes("application/json")) {
       const { text } = await req.json();
       if (!text || typeof text !== "string" || text.trim().length === 0) {
-        return NextResponse.json({ error: "No text provided." }, { status: 400 });
+        return NextResponse.json(
+          { error: "No text provided." },
+          { status: 400 },
+        );
       }
       documentText = text;
     } else {
       const formData = await req.formData();
       const file = formData.get("file") as File | null;
       if (!file) {
-        return NextResponse.json({ error: "No file provided." }, { status: 400 });
+        return NextResponse.json(
+          { error: "No file provided." },
+          { status: 400 },
+        );
       }
       documentText = await extractText(file);
     }
 
     // Checks only the first 3000 characters to verify it's a legal document
     const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a legal document (e.g., contract, Terms of Service, Privacy Policy, Lease, NDA). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
-    const verification = await askOpenAI(gatekeeperPrompt, documentText.substring(0, 3000), apiKey);
+    const verification = await askOpenAI(
+      gatekeeperPrompt,
+      documentText.substring(0, 3000),
+      apiKey,
+    );
 
     if (!verification.is_legal) {
       return NextResponse.json(
-        { error: `This doesn't look like a legal document. AI Reason: ${verification.reason}` },
-        { status: 400 }
+        {
+          error: `This doesn't look like a legal document. AI Reason: ${verification.reason}`,
+        },
+        { status: 400 },
       );
     }
 
@@ -124,12 +156,13 @@ export async function POST(req: NextRequest) {
       risk_score: riskData.risk_score,
       risky_clauses: riskData.risky_clauses,
     });
-
   } catch (error) {
     console.error("Analysis route error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
     );
   }
 }
