@@ -10,7 +10,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "FinePrint | Contract analysis",
+  title: "FinePrint | Contract Analysis",
   description: "AI-powered contract analysis for small business owners",
 };
 
