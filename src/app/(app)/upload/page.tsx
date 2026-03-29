@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { PendingFileRow } from "@/components/upload/PendingFileRow";
+import { DocumentTypeSelector } from "@/components/documents/DocumentTypeSelector";
 
 const DocumentPreview = dynamic(
   () =>
@@ -13,14 +14,6 @@ const DocumentPreview = dynamic(
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
-
-interface RiskyClause {
-  quote: string;
-  explanation: string;
-  severity: number;
-}
-
-
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -47,6 +40,9 @@ export default function UploadPage() {
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null);
+
+  // Document Type
+  const [documentType, setDocumentType] = useState("");
 
   useEffect(() => {
     if (!file || file.type !== 'application/pdf') {
@@ -123,6 +119,7 @@ export default function UploadPage() {
         if (!analysisFile) return;
         const formData = new FormData();
         formData.append("file", analysisFile);
+        formData.append("type", documentType);
         response = await fetch("/api/analyze", {
           method: "POST",
           body: formData,
@@ -190,7 +187,7 @@ export default function UploadPage() {
           Upload a file or paste contract text to start your analysis.
         </p>
       </div>
-
+      <DocumentTypeSelector value={documentType} onChange={setDocumentType}/>
       {/* Mode toggle */}
       <div
         className="mt-8 flex gap-1 rounded-lg bg-navy-850 p-1 opacity-0"
@@ -336,6 +333,7 @@ export default function UploadPage() {
                         </span>
                       </div>
                       <p className="text-sm text-navy-200 mt-1 sm:mt-0 leading-relaxed">{clause[0]}</p>
+                      <p>Quote: {clause[2]}</p>
                     </div>
                   );
                 })
@@ -352,7 +350,7 @@ export default function UploadPage() {
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || !documentType}
             className="flex items-center gap-2 rounded-full bg-gold-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-gold-700 hover:shadow-2xl disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {isAnalyzing ? (
