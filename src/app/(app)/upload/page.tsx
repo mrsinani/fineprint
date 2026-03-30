@@ -131,7 +131,17 @@ export default function UploadPage() {
         });
       }
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: Record<string, any>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          response.status === 413
+            ? "This file is too large. Vercel limits uploads to 4.5 MB. Try a smaller document."
+            : `Server error (${response.status}): ${responseText.slice(0, 120)}`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.error || `Server error: ${response.status}`);
@@ -153,7 +163,17 @@ export default function UploadPage() {
             body: saveFormData,
           });
 
-          const saveData = await saveResponse.json();
+          const saveText = await saveResponse.text();
+          let saveData: Record<string, any>;
+          try {
+            saveData = JSON.parse(saveText);
+          } catch {
+            throw new Error(
+              saveResponse.status === 413
+                ? "This file is too large to save. Try a smaller document."
+                : `Save error (${saveResponse.status}): ${saveText.slice(0, 120)}`
+            );
+          }
 
           if (!saveResponse.ok) {
             throw new Error(saveData.error || `Save error: ${saveResponse.status}`);
