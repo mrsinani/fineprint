@@ -1,12 +1,14 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher(['/', '/api/:path*']);
+const isPublicRoute = createRouteMatcher(["/", "/api/:path*"]);
 
-export default clerkMiddleware(async (auth, request) => {
+const proxy = clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
 });
+
+export default proxy;
 
 export const config = {
   matcher: [
@@ -14,3 +16,4 @@ export const config = {
     "/(api|trpc)(.*)",
   ],
 };
+
