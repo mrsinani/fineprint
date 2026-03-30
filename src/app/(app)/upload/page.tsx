@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { PendingFileRow } from "@/components/upload/PendingFileRow";
 import { DocumentTypeSelector } from "@/components/documents/DocumentTypeSelector";
@@ -39,7 +40,9 @@ export default function UploadPage() {
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const router = useRouter();
 
   // Document Type
   const [documentType, setDocumentType] = useState("");
@@ -87,13 +90,11 @@ export default function UploadPage() {
     setFile(selected);
     setAnalysisFile(selected);
     setFileStatus("pending");
-    setAnalysisResult(null);
   }, []);
 
   const handleRemoveFile = useCallback(() => {
     setFile(null);
     setFileStatus("pending");
-    setAnalysisResult(null);
   }, []);
 
   const simulateFileUpload = useCallback(() => {
@@ -109,7 +110,6 @@ export default function UploadPage() {
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
-    setAnalysisResult(null);
 
     try {
       let response: Response;
@@ -137,7 +137,36 @@ export default function UploadPage() {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
 
-      setAnalysisResult(data);
+      // Save document to database
+      if (mode === "file" && analysisFile) {
+        setIsSaving(true);
+        try {
+          const saveFormData = new FormData();
+          saveFormData.append("file", analysisFile);
+          saveFormData.append("analysisResult", JSON.stringify(data));
+          saveFormData.append("documentType", documentType);
+          saveFormData.append("pageCount", String(totalPages));
+          saveFormData.append("title", analysisFile.name.replace(/\.[^/.]+$/, ""));
+
+          const saveResponse = await fetch("/api/documents", {
+            method: "POST",
+            body: saveFormData,
+          });
+
+          const saveData = await saveResponse.json();
+
+          if (!saveResponse.ok) {
+            throw new Error(saveData.error || `Save error: ${saveResponse.status}`);
+          }
+
+          router.push(`/documents/${saveData.id}`);
+        } catch (saveError) {
+          console.error("Save failed:", saveError);
+          alert(saveError instanceof Error ? saveError.message : "Failed to save document.");
+        } finally {
+          setIsSaving(false);
+        }
+      }
     } catch (error) {
       console.error("Analysis failed:", error);
       alert(error instanceof Error ? error.message : "Failed to analyze document.");
@@ -148,7 +177,6 @@ export default function UploadPage() {
 
   const switchMode = (next: InputMode) => {
     setMode(next);
-    setAnalysisResult(null);
   };
 
   return (
@@ -239,7 +267,6 @@ export default function UploadPage() {
               value={pastedText}
               onChange={(e) => {
                 setPastedText(e.target.value);
-                setAnalysisResult(null);
               }}
               placeholder="Paste your contract text here..."
               rows={14}
@@ -252,141 +279,17 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* --- RESULTS --- */}
-      {analysisResult && (
-        <div 
-          className="mt-12 flex flex-col gap-8 opacity-0"
-          style={{ animation: "fp-fade-in-up 0.6s ease-out 0s forwards" }}
-        >
-          {/* Header with risk score */}
-          <div className="flex items-center justify-between border-b border-navy-700 pb-4">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-navy-100">
-              Analysis Results
-            </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-navy-400 uppercase tracking-wider">Risk Score</span>
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white shadow-lg ${
-                Number(analysisResult.overall_risk_score) > 66
-                  ? 'bg-red-500'
-                  : Number(analysisResult.overall_risk_score) > 33
-                  ? 'bg-orange-500'
-                  : 'bg-emerald-500'
-              }`}>
-                {analysisResult.overall_risk_score}
-              </span>
-            </div>
-          </div>
-
-          {/* Summary Box */}
-          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-navy-400">Plain Language Summary</h3>
-            <p className="text-navy-100 leading-relaxed">{analysisResult.summary?.overview}</p>
-          </div>
-
-          {/* Plain English Bullets */}
-          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Key Points</h3>
-            <ul className="list-inside list-disc space-y-2 text-navy-100">
-              {Array.isArray(analysisResult.summary?.plain_english)
-                ? analysisResult.summary.plain_english.map((bullet: string, i: number) => (
-                    <li key={i}>{bullet}</li>
-                  ))
-                : <li>No key points extracted.</li>}
-            </ul>
-          </div>
-
-          {/* Clauses Box */}
-          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Risky Clauses Detected</h3>
-            <div className="space-y-4">
-              {Array.isArray(analysisResult.clauses) && analysisResult.clauses.length > 0 ? (
-                analysisResult.clauses.map((clause: any, i: number) => {
-                  const sev = clause.severity;
-                  const badgeColors =
-                    sev === "HIGH"
-                      ? "bg-red-500/10 text-red-400 ring-red-500/20"
-                      : sev === "MEDIUM"
-                      ? "bg-amber-500/10 text-amber-400 ring-amber-500/20"
-                      : "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
-
-                  return (
-                    <div key={clause.id ?? i} className="flex flex-col gap-3 rounded-lg bg-navy-900 p-4 border border-navy-800">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${badgeColors}`}>
-                          {sev}
-                        </span>
-                        {clause.section && (
-                          <span className="text-xs text-navy-500">§ {clause.section}</span>
-                        )}
-                      </div>
-                      <p className="text-sm text-navy-200 leading-relaxed">{clause.explanation}</p>
-                      {clause.quote && (
-                        <p className="text-xs italic text-navy-400 border-l-2 border-navy-700 pl-3">
-                          &ldquo;{clause.quote}&rdquo;
-                        </p>
-                      )}
-                      {clause.recommendation && (
-                        <p className="text-xs text-navy-300 font-medium">{clause.recommendation}</p>
-                      )}
-                      {Array.isArray(clause.triggered_features) && clause.triggered_features.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {clause.triggered_features.map((feat: string, fi: number) => (
-                            <span key={fi} className="inline-flex items-center rounded-full bg-navy-800 px-2 py-0.5 text-[11px] text-navy-400 ring-1 ring-navy-700">
-                              {feat}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-navy-400">No significant risks detected in this document.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Action Items Box */}
-          {Array.isArray(analysisResult.action_items) && analysisResult.action_items.length > 0 && (
-            <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Action Items</h3>
-              <div className="space-y-4">
-                {analysisResult.action_items.map((item: any, i: number) => {
-                  const prio = item.priority;
-                  const prioBadge =
-                    prio === "HIGH"
-                      ? "bg-red-500/10 text-red-400 ring-red-500/20"
-                      : prio === "MEDIUM"
-                      ? "bg-amber-500/10 text-amber-400 ring-amber-500/20"
-                      : "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
-
-                  return (
-                    <div key={i} className="flex flex-col gap-2 rounded-lg bg-navy-900 p-4 border border-navy-800">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${prioBadge}`}>
-                          {prio}
-                        </span>
-                        <span className="text-sm font-semibold text-navy-100">{item.title}</span>
-                      </div>
-                      <p className="text-sm text-navy-300 leading-relaxed">{item.description}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {canAnalyze && !analysisResult && (
+      {canAnalyze && (
         <div className="fixed bottom-8 right-8 flex transform justify-center">
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={isAnalyzing || !documentType}
+            disabled={isAnalyzing || isSaving || !documentType}
             className="flex items-center gap-2 rounded-full bg-gold-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-gold-700 hover:shadow-2xl disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {isAnalyzing ? (
+            {isSaving ? (
+              <span className="animate-pulse">Saving...</span>
+            ) : isAnalyzing ? (
               <span className="animate-pulse">Analyzing...</span>
             ) : (
               <>

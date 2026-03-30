@@ -1,33 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import mammoth from "mammoth";
-import { extractText as extractPdfText } from "unpdf";
 import { anonymizeDocument } from "@/app/utils/anonymize";
 import { deanonymizeText } from "@/app/utils/anonymize";
 import { TAXONOMY } from "@/lib/taxonomy";
 import { computeClauseSeverity, computeDocumentScore } from "@/lib/scoring";
-
-// --- Text Extraction Helper ---
-async function extractText(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  if (file.type === "text/plain") {
-    return buffer.toString("utf-8");
-  }
-  if (file.type === "application/pdf") {
-    const { text } = await extractPdfText(new Uint8Array(buffer), {
-      mergePages: true as const,
-    });
-    return Array.isArray(text) ? text.join("\n\n") : text;
-  }
-  if (
-    file.type ===
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  ) {
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
-  }
-  throw new Error("Unsupported file type. Please use .pdf, .docx, or .txt");
-}
+import { extractText } from "@/lib/extractText";
 
 // --- OpenAI Fetch Helper ---
 async function askOpenAI(
@@ -60,10 +36,9 @@ async function askOpenAI(
     if (!response.ok) {
       const errorBody = await response.text();
       if (response.status === 413) {
-        alert("This file is too large to process. Please upload a smaller document.");
+        throw new Error("This file is too large to process. Please upload a smaller document.");
       } else {
         if (attempt < retries) continue;
-        alert(`Server Error: ${errorBody}`);
       }
       throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
     }
@@ -134,7 +109,7 @@ export async function POST(req: NextRequest) {
     const { scrubbedText, vault } = anonymizeDocument(rawDocumentText);
 
     // --- 2. GATEKEEPER CHECK (Using Scrubbed Text) ---
-    const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a ${documentType}. Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
+    const gatekeeperPrompt = `You are a lenient document classifier. Determine if the provided text is a legal or contractual document (e.g. lease, contract, agreement, terms of service, policy, NDA, etc.). The user labeled it as "${documentType}" but accept any legal/contractual document regardless of the specific type. Only reject text that is clearly NOT a legal document (e.g. a recipe, a novel, random notes). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
     const verification = await askOpenAI(
       gatekeeperPrompt,
       scrubbedText.substring(0, 3000),

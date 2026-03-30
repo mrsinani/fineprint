@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser, useClerk } from "@clerk/nextjs";
 import {
   Home,
   Upload,
   FileText,
   Trash2,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +53,13 @@ function NavLink({
 export function Sidebar() {
   const pathname = usePathname();
   const isActive = (href: string) => pathname.startsWith(href);
+  const { user } = useUser();
+  const { signOut } = useClerk();
+
+  const initials = [user?.firstName, user?.lastName]
+    .filter(Boolean)
+    .map((n) => n![0].toUpperCase())
+    .join("") || "?";
 
   return (
     <aside
@@ -60,14 +69,22 @@ export function Sidebar() {
       {/* User block */}
       <div className="px-4 pb-2 pt-6">
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-500 text-sm font-bold text-white"
-            aria-hidden
-          >
-            OP
-          </div>
+          {user?.imageUrl ? (
+            <img
+              src={user.imageUrl}
+              alt={user.fullName ?? user.firstName ?? "User avatar"}
+              className="h-10 w-10 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-500 text-sm font-bold text-white"
+              aria-hidden
+            >
+              {initials}
+            </div>
+          )}
           <span className="truncate text-sm font-semibold text-navy-100">
-            John Doe
+            {user?.fullName ?? user?.firstName ?? ""}
           </span>
         </div>
       </div>
@@ -120,6 +137,14 @@ export function Sidebar() {
           >
             My Profile
           </Link>
+          <button
+            type="button"
+            onClick={() => signOut({ redirectUrl: "/" })}
+            className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-navy-400 transition-colors hover:text-navy-200"
+          >
+            <LogOut size={14} strokeWidth={2} aria-hidden />
+            Sign out
+          </button>
         </div>
       </nav>
     </aside>

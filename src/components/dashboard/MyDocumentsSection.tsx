@@ -3,14 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { List, LayoutGrid, ArrowRight } from "lucide-react";
-import { DocumentCard } from "@/components/documents/DocumentCard";
-import { MOCK_DOCUMENTS } from "@/components/documents/MockDocuments";
+import { DocumentCard, type DocumentCardProps } from "@/components/documents/DocumentCard";
 
 type ViewMode = "grid" | "list";
 
-export function MyDocumentsSection() {
+export function MyDocumentsSection({ documents }: { documents: DocumentCardProps[] }) {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const documents = MOCK_DOCUMENTS;
 
   return (
     <section aria-labelledby="my-documents-heading">
@@ -23,7 +21,7 @@ export function MyDocumentsSection() {
             My documents
           </h2>
           <p className="mt-0.5 text-sm text-navy-500">
-            Some copy line here
+            Recently analyzed contracts
           </p>
         </div>
         <div
@@ -60,41 +58,51 @@ export function MyDocumentsSection() {
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-4">
-        <div
-          className={`flex gap-4 overflow-x-auto pb-2 ${
-            viewMode === "grid" ? "flex-nowrap" : "flex-col overflow-x-visible"
-          }`}
-          style={viewMode === "grid" ? { scrollbarWidth: "thin" } : undefined}
-        >
-          {documents.map((doc, i) => (
-            <div
-              key={i}
-              className="opacity-0"
-              style={{
-                animation: `fp-fade-in-up 0.5s ease-out ${0.1 + i * 0.08}s forwards`,
-              }}
-            >
-              <DocumentCard id={`${i}`} {...doc} />
-            </div>
-          ))}
-          <div
-            className="min-h-[180px] min-w-[220px] max-w-[240px] rounded-xl border border-dashed border-navy-700"
-            aria-hidden
-          />
-          <div
-            className="min-h-[180px] min-w-[220px] max-w-[240px] rounded-xl border border-dashed border-navy-700"
-            aria-hidden
-          />
+      {documents.length === 0 ? (
+        <div className="mt-5 rounded-xl border border-dashed border-navy-700 py-12 text-center">
+          <p className="text-sm text-navy-500">No documents yet.</p>
+          <Link
+            href="/upload"
+            className="mt-2 inline-block text-sm font-medium text-gold-600 transition-colors hover:text-gold-700"
+          >
+            Upload your first document &rarr;
+          </Link>
         </div>
-        <Link
-          href="/documents"
-          className="shrink-0 text-gold-600 transition-transform duration-200 hover:translate-x-0.5"
-          aria-label="View all documents"
-        >
-          <ArrowRight size={24} strokeWidth={2} />
-        </Link>
-      </div>
+      ) : (
+        <div className="mt-5">
+          <ul
+            className={
+              viewMode === "grid"
+                ? "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+                : "flex flex-col gap-3"
+            }
+            role="list"
+          >
+            {documents.map((doc, i) => (
+              <li
+                key={doc.id ?? i}
+                className="opacity-0"
+                style={{
+                  animation: `fp-fade-in-up 0.5s ease-out ${0.1 + i * 0.08}s forwards`,
+                }}
+              >
+                <DocumentCard {...doc} />
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-4 text-right">
+            <Link
+              href="/documents"
+              className="inline-flex items-center gap-1 text-sm font-medium text-gold-600 transition-colors hover:text-gold-700"
+              aria-label="View all documents"
+            >
+              View all
+              <ArrowRight size={16} strokeWidth={2} />
+            </Link>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
