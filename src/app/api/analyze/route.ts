@@ -4,6 +4,8 @@ import { deanonymizeText } from "@/app/utils/anonymize";
 import { TAXONOMY } from "@/lib/taxonomy";
 import { computeClauseSeverity, computeDocumentScore } from "@/lib/scoring";
 import { extractText } from "@/lib/extractText";
+import { extractTextFromBuffer } from "@/lib/extractText";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // --- OpenAI Fetch Helper ---
 async function askOpenAI(
@@ -75,17 +77,48 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get("content-type") || "";
     let rawDocumentText: string;
 
-    // Handle both Text Paste (JSON) and File Upload (FormData)
     if (contentType.includes("application/json")) {
-      const { text } = await req.json();
-      if (!text || typeof text !== "string" || text.trim().length === 0) {
+      const body = await req.json();
+
+      if (body.storagePath) {
+        // File already in Supabase Storage -- download and extract text
+        documentType = body.documentType ?? "";
+        if (!documentType) {
+          return NextResponse.json(
+            { error: "Document type not specified." },
+            { status: 400 },
+          );
+        }
+        const supabase = createAdminClient();
+        const { data: fileData, error: dlError } = await supabase.storage
+          .from("documents")
+          .download(body.storagePath);
+        if (dlError || !fileData) {
+          return NextResponse.json(
+            { error: `Failed to download file: ${dlError?.message}` },
+            { status: 500 },
+          );
+        }
+        const buffer = Buffer.from(await fileData.arrayBuffer());
+        const mimeType = body.fileType ?? "application/pdf";
+        rawDocumentText = await extractTextFromBuffer(buffer, mimeType);
+      } else if (body.text) {
+        // Plain text paste mode
+        if (typeof body.text !== "string" || body.text.trim().length === 0) {
+          return NextResponse.json(
+            { error: "No text provided." },
+            { status: 400 },
+          );
+        }
+        rawDocumentText = body.text;
+      } else {
         return NextResponse.json(
-          { error: "No text provided." },
+          { error: "No text or storagePath provided." },
           { status: 400 },
         );
       }
-      rawDocumentText = text;
     } else {
+      // Legacy: FormData file upload (still works for local dev / small files)
       const formData = await req.formData();
       documentType = formData.get("type") as string;
 

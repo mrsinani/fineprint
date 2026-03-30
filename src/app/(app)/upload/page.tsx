@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { PendingFileRow } from "@/components/upload/PendingFileRow";
 import { DocumentTypeSelector } from "@/components/documents/DocumentTypeSelector";
@@ -20,6 +21,28 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+async function uploadToStorage(file: File): Promise<{ storagePath: string; docId: string }> {
+  const signRes = await fetch("/api/upload/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileName: file.name, fileType: file.type }),
+  });
+  if (!signRes.ok) {
+    const err = await signRes.json().catch(() => ({ error: "Failed to get upload URL" }));
+    throw new Error(err.error);
+  }
+  const { signedUrl, token, storagePath, docId } = await signRes.json();
+
+  const supabase = createClient();
+  const { error } = await supabase.storage
+    .from("documents")
+    .uploadToSignedUrl(storagePath, token, file, { contentType: file.type });
+
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  return { storagePath, docId };
 }
 
 export default function UploadPage() {
@@ -40,7 +63,7 @@ export default function UploadPage() {
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
   const router = useRouter();
 
@@ -110,81 +133,80 @@ export default function UploadPage() {
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
+    setStatusMessage("");
 
     try {
-      let response: Response;
-
       if (mode === "file") {
         if (!analysisFile) return;
-        const formData = new FormData();
-        formData.append("file", analysisFile);
-        formData.append("type", documentType);
-        response = await fetch("/api/analyze", {
+
+        // 1. Upload file directly to Supabase Storage (bypasses Vercel size limit)
+        setStatusMessage("Uploading...");
+        const { storagePath, docId } = await uploadToStorage(analysisFile);
+
+        // 2. Analyze via storage path (small JSON payload to Vercel)
+        setStatusMessage("Analyzing...");
+        const analyzeRes = await fetch("/api/analyze", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storagePath,
+            documentType,
+            fileType: analysisFile.type,
+          }),
         });
+
+        const analyzeText = await analyzeRes.text();
+        let data: Record<string, any>;
+        try {
+          data = JSON.parse(analyzeText);
+        } catch {
+          throw new Error(`Server error (${analyzeRes.status}): ${analyzeText.slice(0, 120)}`);
+        }
+        if (!analyzeRes.ok) {
+          throw new Error(data.error || `Analysis error: ${analyzeRes.status}`);
+        }
+
+        // 3. Save document + analysis to database (small JSON payload)
+        setStatusMessage("Saving...");
+        const saveRes = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storagePath,
+            docId,
+            fileName: analysisFile.name,
+            fileType: analysisFile.type,
+            analysisResult: data,
+            documentType,
+            pageCount: totalPages,
+            title: analysisFile.name.replace(/\.[^/.]+$/, ""),
+          }),
+        });
+
+        const saveData = await saveRes.json();
+        if (!saveRes.ok) {
+          throw new Error(saveData.error || `Save error: ${saveRes.status}`);
+        }
+
+        router.push(`/documents/${saveData.id}`);
       } else {
-        response = await fetch("/api/analyze", {
+        // Text paste mode -- no storage needed
+        setStatusMessage("Analyzing...");
+        const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: pastedText }),
         });
-      }
 
-      const responseText = await response.text();
-      let data: Record<string, any>;
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        throw new Error(
-          response.status === 413
-            ? "This file is too large. Vercel limits uploads to 4.5 MB. Try a smaller document."
-            : `Server error (${response.status}): ${responseText.slice(0, 120)}`
-        );
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server error: ${response.status}`);
-      }
-
-      // Save document to database
-      if (mode === "file" && analysisFile) {
-        setIsSaving(true);
+        const responseText = await response.text();
+        let data: Record<string, any>;
         try {
-          const saveFormData = new FormData();
-          saveFormData.append("file", analysisFile);
-          saveFormData.append("analysisResult", JSON.stringify(data));
-          saveFormData.append("documentType", documentType);
-          saveFormData.append("pageCount", String(totalPages));
-          saveFormData.append("title", analysisFile.name.replace(/\.[^/.]+$/, ""));
-
-          const saveResponse = await fetch("/api/documents", {
-            method: "POST",
-            body: saveFormData,
-          });
-
-          const saveText = await saveResponse.text();
-          let saveData: Record<string, any>;
-          try {
-            saveData = JSON.parse(saveText);
-          } catch {
-            throw new Error(
-              saveResponse.status === 413
-                ? "This file is too large to save. Try a smaller document."
-                : `Save error (${saveResponse.status}): ${saveText.slice(0, 120)}`
-            );
-          }
-
-          if (!saveResponse.ok) {
-            throw new Error(saveData.error || `Save error: ${saveResponse.status}`);
-          }
-
-          router.push(`/documents/${saveData.id}`);
-        } catch (saveError) {
-          console.error("Save failed:", saveError);
-          alert(saveError instanceof Error ? saveError.message : "Failed to save document.");
-        } finally {
-          setIsSaving(false);
+          data = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Server error (${response.status}): ${responseText.slice(0, 120)}`);
+        }
+        if (!response.ok) {
+          throw new Error(data.error || `Server error: ${response.status}`);
         }
       }
     } catch (error) {
@@ -192,6 +214,7 @@ export default function UploadPage() {
       alert(error instanceof Error ? error.message : "Failed to analyze document.");
     } finally {
       setIsAnalyzing(false);
+      setStatusMessage("");
     }
   };
 
@@ -304,13 +327,11 @@ export default function UploadPage() {
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={isAnalyzing || isSaving || !documentType}
+            disabled={isAnalyzing || !documentType}
             className="flex items-center gap-2 rounded-full bg-gold-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-gold-700 hover:shadow-2xl disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {isSaving ? (
-              <span className="animate-pulse">Saving...</span>
-            ) : isAnalyzing ? (
-              <span className="animate-pulse">Analyzing...</span>
+            {isAnalyzing ? (
+              <span className="animate-pulse">{statusMessage || "Processing..."}</span>
             ) : (
               <>
                 <span>Analyze Content</span>

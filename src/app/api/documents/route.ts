@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { extractText } from "@/lib/extractText";
+import { extractTextFromBuffer } from "@/lib/extractText";
 import { ensureUserExists } from "@/lib/ensureUserExists";
 
 export async function POST(req: Request) {
@@ -12,50 +12,53 @@ export async function POST(req: Request) {
 
   await ensureUserExists(userId);
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-  const analysisResultRaw = formData.get("analysisResult") as string | null;
-  const documentType = formData.get("documentType") as string;
-  const pageCount = Number(formData.get("pageCount") ?? 0);
-  const title = formData.get("title") as string;
+  const body = await req.json();
+  const {
+    storagePath,
+    docId,
+    fileName,
+    fileType,
+    analysisResult,
+    documentType,
+    pageCount,
+    title,
+  } = body;
 
-  if (!file || !analysisResultRaw) {
+  if (!storagePath || !analysisResult || !docId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const analysisResult = JSON.parse(analysisResultRaw);
-  const raw_text = await extractText(file);
-  const docId = crypto.randomUUID();
-  const filePath = `${userId}/${docId}/${file.name}`;
-
   const supabase = createAdminClient();
 
-  // Upload file to Supabase Storage
-  const fileBuffer = await file.arrayBuffer();
-  const { error: uploadError } = await supabase.storage
-    .from("documents")
-    .upload(filePath, fileBuffer, { contentType: file.type });
-
-  if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  // Extract raw text from the file already in storage
+  let raw_text: string | null = null;
+  try {
+    const { data: fileData, error: dlError } = await supabase.storage
+      .from("documents")
+      .download(storagePath);
+    if (!dlError && fileData) {
+      const buffer = Buffer.from(await fileData.arrayBuffer());
+      raw_text = await extractTextFromBuffer(buffer, fileType ?? "application/pdf");
+    }
+  } catch {
+    // Non-fatal: raw_text is a nice-to-have
   }
 
   // Insert document row
   const { error: docError } = await supabase.from("documents").insert({
     id: docId,
     user_id: userId,
-    title,
-    file_name: file.name,
-    file_type: file.type,
-    file_path: filePath,
-    page_count: pageCount,
+    title: title ?? fileName ?? "Untitled",
+    file_name: fileName,
+    file_type: fileType,
+    file_path: storagePath,
+    page_count: pageCount ?? 0,
     document_type: documentType,
     overall_risk_score: analysisResult.overall_risk_score ?? null,
   });
 
   if (docError) {
-    // Compensate: remove uploaded storage object
-    await supabase.storage.from("documents").remove([filePath]);
+    await supabase.storage.from("documents").remove([storagePath]);
     return NextResponse.json({ error: docError.message }, { status: 500 });
   }
 
@@ -66,13 +69,12 @@ export async function POST(req: Request) {
     clauses: analysisResult.clauses ?? null,
     action_items: analysisResult.action_items ?? null,
     overall_risk_score: analysisResult.overall_risk_score ?? null,
-    raw_text: raw_text ?? null,
+    raw_text,
   });
 
   if (analysisError) {
-    // Compensate: remove document row and storage object
     await supabase.from("documents").delete().eq("id", docId);
-    await supabase.storage.from("documents").remove([filePath]);
+    await supabase.storage.from("documents").remove([storagePath]);
     return NextResponse.json({ error: analysisError.message }, { status: 500 });
   }
 
