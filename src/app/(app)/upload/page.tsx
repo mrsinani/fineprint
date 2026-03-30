@@ -61,7 +61,6 @@ export default function UploadPage() {
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const pages = pdfDoc.getPages();
       
-      // Your reverse sort is perfect here to prevent index shifting
       const sortedExcluded = [...excludedPages].sort((a, b) => b - a);
       
       for (const pageNum of sortedExcluded) {
@@ -137,29 +136,7 @@ export default function UploadPage() {
       if (!response.ok) {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
-      
-      // --- SEVERITY MATH CALCULATION ---
-      let calculatedScore = 1; // Base score (safe)
-      console.log("Data:", data)
-      if (data.risky_clauses && data.risky_clauses.length > 0) {
-        const maxSeverity = Math.max(...data.risky_clauses.map((c: any) => c[1]));
-        const clauseCount = data.risky_clauses.length;
 
-        // Base score on the absolute worst clause found
-        if (maxSeverity === 4) calculatedScore = 8;
-        else if (maxSeverity === 3) calculatedScore = 5;
-        else if (maxSeverity === 2) calculatedScore = 3;
-        else if (maxSeverity === 1) calculatedScore = 2;
-
-        // Add volume penalty (death by a thousand papercuts)
-        const volumePenalty = Math.min(clauseCount * 0.5, 2); // Max +2 points
-        calculatedScore += volumePenalty;
-        
-        // Cap at 10 and round
-        calculatedScore = Math.min(Math.round(calculatedScore), 10);
-      }
-
-      data.overall_risk_score = calculatedScore;
       setAnalysisResult(data);
     } catch (error) {
       console.error("Analysis failed:", error);
@@ -275,12 +252,13 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* --- REPLACED RAW JSON WITH STYLED RESULTS --- */}
+      {/* --- RESULTS --- */}
       {analysisResult && (
         <div 
           className="mt-12 flex flex-col gap-8 opacity-0"
           style={{ animation: "fp-fade-in-up 0.6s ease-out 0s forwards" }}
         >
+          {/* Header with risk score */}
           <div className="flex items-center justify-between border-b border-navy-700 pb-4">
             <h2 className="font-display text-2xl font-bold tracking-tight text-navy-100">
               Analysis Results
@@ -288,7 +266,11 @@ export default function UploadPage() {
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-navy-400 uppercase tracking-wider">Risk Score</span>
               <span className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white shadow-lg ${
-                Number(analysisResult.overall_risk_score) > 7 ? 'bg-red-500' : Number(analysisResult.overall_risk_score) > 4 ? 'bg-orange-500' : 'bg-emerald-500'
+                Number(analysisResult.overall_risk_score) > 66
+                  ? 'bg-red-500'
+                  : Number(analysisResult.overall_risk_score) > 33
+                  ? 'bg-orange-500'
+                  : 'bg-emerald-500'
               }`}>
                 {analysisResult.overall_risk_score}
               </span>
@@ -298,42 +280,63 @@ export default function UploadPage() {
           {/* Summary Box */}
           <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-navy-400">Plain Language Summary</h3>
-            <p className="text-navy-100 leading-relaxed">{analysisResult.summary}</p>
+            <p className="text-navy-100 leading-relaxed">{analysisResult.summary?.overview}</p>
           </div>
 
-          {/* Obligations Box */}
+          {/* Plain English Bullets */}
           <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Key Obligations</h3>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Key Points</h3>
             <ul className="list-inside list-disc space-y-2 text-navy-100">
-              {Array.isArray(analysisResult.obligations) ? analysisResult.obligations.map((ob: string, i: number) => (
-                <li key={i}>{ob}</li>
-              )) : <li>No specific obligations detected.</li>}
+              {Array.isArray(analysisResult.summary?.plain_english)
+                ? analysisResult.summary.plain_english.map((bullet: string, i: number) => (
+                    <li key={i}>{bullet}</li>
+                  ))
+                : <li>No key points extracted.</li>}
             </ul>
           </div>
 
-          {/* Risky Clauses Box */}
+          {/* Clauses Box */}
           <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Risky Clauses Detected</h3>
             <div className="space-y-4">
-              {Array.isArray(analysisResult.risky_clauses) && analysisResult.risky_clauses.length > 0 ? (
-                analysisResult.risky_clauses.map((clause: any, i: number) => {
-                  const level = clause[1];
-                  let badgeColors = "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
-                  let levelText = "Standard";
-                  
-                  if (level === 4) { badgeColors = "bg-red-500/10 text-red-400 ring-red-500/20"; levelText = "Critical"; }
-                  else if (level === 3) { badgeColors = "bg-orange-500/10 text-orange-400 ring-orange-500/20"; levelText = "High Risk"; }
-                  else if (level === 2) { badgeColors = "bg-amber-500/10 text-amber-400 ring-amber-500/20"; levelText = "Moderate"; }
+              {Array.isArray(analysisResult.clauses) && analysisResult.clauses.length > 0 ? (
+                analysisResult.clauses.map((clause: any, i: number) => {
+                  const sev = clause.severity;
+                  const badgeColors =
+                    sev === "HIGH"
+                      ? "bg-red-500/10 text-red-400 ring-red-500/20"
+                      : sev === "MEDIUM"
+                      ? "bg-amber-500/10 text-amber-400 ring-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
 
                   return (
-                    <div key={i} className="flex flex-col gap-2 sm:flex-row sm:gap-4 rounded-lg bg-navy-900 p-4 border border-navy-800">
-                      <div className="flex-shrink-0 pt-0.5">
+                    <div key={clause.id ?? i} className="flex flex-col gap-3 rounded-lg bg-navy-900 p-4 border border-navy-800">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${badgeColors}`}>
-                          Lvl {level}: {levelText}
+                          {sev}
                         </span>
+                        {clause.section && (
+                          <span className="text-xs text-navy-500">§ {clause.section}</span>
+                        )}
                       </div>
-                      <p className="text-sm text-navy-200 mt-1 sm:mt-0 leading-relaxed">{clause[0]}</p>
-                      <p>Quote: {clause[2]}</p>
+                      <p className="text-sm text-navy-200 leading-relaxed">{clause.explanation}</p>
+                      {clause.quote && (
+                        <p className="text-xs italic text-navy-400 border-l-2 border-navy-700 pl-3">
+                          &ldquo;{clause.quote}&rdquo;
+                        </p>
+                      )}
+                      {clause.recommendation && (
+                        <p className="text-xs text-navy-300 font-medium">{clause.recommendation}</p>
+                      )}
+                      {Array.isArray(clause.triggered_features) && clause.triggered_features.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {clause.triggered_features.map((feat: string, fi: number) => (
+                            <span key={fi} className="inline-flex items-center rounded-full bg-navy-800 px-2 py-0.5 text-[11px] text-navy-400 ring-1 ring-navy-700">
+                              {feat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -342,6 +345,36 @@ export default function UploadPage() {
               )}
             </div>
           </div>
+
+          {/* Action Items Box */}
+          {Array.isArray(analysisResult.action_items) && analysisResult.action_items.length > 0 && (
+            <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Action Items</h3>
+              <div className="space-y-4">
+                {analysisResult.action_items.map((item: any, i: number) => {
+                  const prio = item.priority;
+                  const prioBadge =
+                    prio === "HIGH"
+                      ? "bg-red-500/10 text-red-400 ring-red-500/20"
+                      : prio === "MEDIUM"
+                      ? "bg-amber-500/10 text-amber-400 ring-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
+
+                  return (
+                    <div key={i} className="flex flex-col gap-2 rounded-lg bg-navy-900 p-4 border border-navy-800">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${prioBadge}`}>
+                          {prio}
+                        </span>
+                        <span className="text-sm font-semibold text-navy-100">{item.title}</span>
+                      </div>
+                      <p className="text-sm text-navy-300 leading-relaxed">{item.description}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
