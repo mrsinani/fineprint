@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.98.0",
+    "compromise": "^14.15.0",
     "lucide-react": "^0.577.0",
     "mammoth": "^1.11.0",
     "mui": "^0.0.1",
