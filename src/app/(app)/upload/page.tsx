@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { PendingFileRow } from "@/components/upload/PendingFileRow";
 import { DocumentTypeSelector } from "@/components/documents/DocumentTypeSelector";
@@ -39,7 +40,9 @@ export default function UploadPage() {
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const router = useRouter();
 
   // Document Type
   const [documentType, setDocumentType] = useState("");
@@ -61,7 +64,6 @@ export default function UploadPage() {
       const pdfDoc = await PDFDocument.load(arrayBuffer);
       const pages = pdfDoc.getPages();
       
-      // Your reverse sort is perfect here to prevent index shifting
       const sortedExcluded = [...excludedPages].sort((a, b) => b - a);
       
       for (const pageNum of sortedExcluded) {
@@ -88,13 +90,11 @@ export default function UploadPage() {
     setFile(selected);
     setAnalysisFile(selected);
     setFileStatus("pending");
-    setAnalysisResult(null);
   }, []);
 
   const handleRemoveFile = useCallback(() => {
     setFile(null);
     setFileStatus("pending");
-    setAnalysisResult(null);
   }, []);
 
   const simulateFileUpload = useCallback(() => {
@@ -110,7 +110,6 @@ export default function UploadPage() {
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
-    setAnalysisResult(null);
 
     try {
       let response: Response;
@@ -137,30 +136,37 @@ export default function UploadPage() {
       if (!response.ok) {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
-      
-      // --- SEVERITY MATH CALCULATION ---
-      let calculatedScore = 1; // Base score (safe)
-      console.log("Data:", data)
-      if (data.risky_clauses && data.risky_clauses.length > 0) {
-        const maxSeverity = Math.max(...data.risky_clauses.map((c: any) => c[1]));
-        const clauseCount = data.risky_clauses.length;
 
-        // Base score on the absolute worst clause found
-        if (maxSeverity === 4) calculatedScore = 8;
-        else if (maxSeverity === 3) calculatedScore = 5;
-        else if (maxSeverity === 2) calculatedScore = 3;
-        else if (maxSeverity === 1) calculatedScore = 2;
+      // Save document to database
+      if (mode === "file" && analysisFile) {
+        setIsSaving(true);
+        try {
+          const saveFormData = new FormData();
+          saveFormData.append("file", analysisFile);
+          saveFormData.append("analysisResult", JSON.stringify(data));
+          saveFormData.append("documentType", documentType);
+          saveFormData.append("pageCount", String(totalPages));
+          saveFormData.append("title", analysisFile.name.replace(/\.[^/.]+$/, ""));
 
-        // Add volume penalty (death by a thousand papercuts)
-        const volumePenalty = Math.min(clauseCount * 0.5, 2); // Max +2 points
-        calculatedScore += volumePenalty;
-        
-        // Cap at 10 and round
-        calculatedScore = Math.min(Math.round(calculatedScore), 10);
+          const saveResponse = await fetch("/api/documents", {
+            method: "POST",
+            body: saveFormData,
+          });
+
+          const saveData = await saveResponse.json();
+
+          if (!saveResponse.ok) {
+            throw new Error(saveData.error || `Save error: ${saveResponse.status}`);
+          }
+
+          router.push(`/documents/${saveData.id}`);
+        } catch (saveError) {
+          console.error("Save failed:", saveError);
+          alert(saveError instanceof Error ? saveError.message : "Failed to save document.");
+        } finally {
+          setIsSaving(false);
+        }
       }
-
-      data.overall_risk_score = calculatedScore;
-      setAnalysisResult(data);
     } catch (error) {
       console.error("Analysis failed:", error);
       alert(error instanceof Error ? error.message : "Failed to analyze document.");
@@ -171,7 +177,6 @@ export default function UploadPage() {
 
   const switchMode = (next: InputMode) => {
     setMode(next);
-    setAnalysisResult(null);
   };
 
   return (
@@ -262,7 +267,6 @@ export default function UploadPage() {
               value={pastedText}
               onChange={(e) => {
                 setPastedText(e.target.value);
-                setAnalysisResult(null);
               }}
               placeholder="Paste your contract text here..."
               rows={14}
@@ -275,85 +279,17 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* --- REPLACED RAW JSON WITH STYLED RESULTS --- */}
-      {analysisResult && (
-        <div 
-          className="mt-12 flex flex-col gap-8 opacity-0"
-          style={{ animation: "fp-fade-in-up 0.6s ease-out 0s forwards" }}
-        >
-          <div className="flex items-center justify-between border-b border-navy-700 pb-4">
-            <h2 className="font-display text-2xl font-bold tracking-tight text-navy-100">
-              Analysis Results
-            </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-navy-400 uppercase tracking-wider">Risk Score</span>
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white shadow-lg ${
-                Number(analysisResult.overall_risk_score) > 7 ? 'bg-red-500' : Number(analysisResult.overall_risk_score) > 4 ? 'bg-orange-500' : 'bg-emerald-500'
-              }`}>
-                {analysisResult.overall_risk_score}
-              </span>
-            </div>
-          </div>
-
-          {/* Summary Box */}
-          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-navy-400">Plain Language Summary</h3>
-            <p className="text-navy-100 leading-relaxed">{analysisResult.summary}</p>
-          </div>
-
-          {/* Obligations Box */}
-          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Key Obligations</h3>
-            <ul className="list-inside list-disc space-y-2 text-navy-100">
-              {Array.isArray(analysisResult.obligations) ? analysisResult.obligations.map((ob: string, i: number) => (
-                <li key={i}>{ob}</li>
-              )) : <li>No specific obligations detected.</li>}
-            </ul>
-          </div>
-
-          {/* Risky Clauses Box */}
-          <div className="rounded-xl border border-navy-700 bg-navy-850 p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-navy-400">Risky Clauses Detected</h3>
-            <div className="space-y-4">
-              {Array.isArray(analysisResult.risky_clauses) && analysisResult.risky_clauses.length > 0 ? (
-                analysisResult.risky_clauses.map((clause: any, i: number) => {
-                  const level = clause[1];
-                  let badgeColors = "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20";
-                  let levelText = "Standard";
-                  
-                  if (level === 4) { badgeColors = "bg-red-500/10 text-red-400 ring-red-500/20"; levelText = "Critical"; }
-                  else if (level === 3) { badgeColors = "bg-orange-500/10 text-orange-400 ring-orange-500/20"; levelText = "High Risk"; }
-                  else if (level === 2) { badgeColors = "bg-amber-500/10 text-amber-400 ring-amber-500/20"; levelText = "Moderate"; }
-
-                  return (
-                    <div key={i} className="flex flex-col gap-2 sm:flex-row sm:gap-4 rounded-lg bg-navy-900 p-4 border border-navy-800">
-                      <div className="flex-shrink-0 pt-0.5">
-                        <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${badgeColors}`}>
-                          Lvl {level}: {levelText}
-                        </span>
-                      </div>
-                      <p className="text-sm text-navy-200 mt-1 sm:mt-0 leading-relaxed">{clause[0]}</p>
-                      <p>Quote: {clause[2]}</p>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-navy-400">No significant risks detected in this document.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {canAnalyze && !analysisResult && (
+      {canAnalyze && (
         <div className="fixed bottom-8 right-8 flex transform justify-center">
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={isAnalyzing || !documentType}
+            disabled={isAnalyzing || isSaving || !documentType}
             className="flex items-center gap-2 rounded-full bg-gold-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-gold-700 hover:shadow-2xl disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {isAnalyzing ? (
+            {isSaving ? (
+              <span className="animate-pulse">Saving...</span>
+            ) : isAnalyzing ? (
               <span className="animate-pulse">Analyzing...</span>
             ) : (
               <>

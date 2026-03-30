@@ -1,9 +1,35 @@
 import Link from "next/link";
 import { File } from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
 import { DocumentCard } from "@/components/documents/DocumentCard";
-import { MOCK_DOCUMENTS } from "@/components/documents/MockDocuments";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureUserExists } from "@/lib/ensureUserExists";
 
-export default function DocumentsPage() {
+export default async function DocumentsPage() {
+  const { userId } = await auth();
+  await ensureUserExists(userId!);
+  const supabase = createAdminClient();
+
+  const { data: rows } = await supabase
+    .from("documents")
+    .select("*")
+    .eq("user_id", userId!)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  const documents = (rows ?? []).map((row) => ({
+    id: row.id as string,
+    title: (row.title as string) ?? row.file_name ?? "Untitled",
+    fileName: row.file_name as string | undefined,
+    fileType: row.file_type as string | undefined,
+    pages: row.page_count as number | undefined,
+    createdAt: new Date(row.created_at as string).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+  }));
+
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <div
@@ -30,17 +56,17 @@ export default function DocumentsPage() {
         className="mt-10 opacity-0"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.25s forwards" }}
       >
-        {MOCK_DOCUMENTS.length > 0 ? (
+        {documents.length > 0 ? (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="list">
-            {MOCK_DOCUMENTS.map((doc, i) => (
+            {documents.map((doc, i) => (
               <li
-                key={i}
+                key={doc.id}
                 className="opacity-0"
                 style={{
                   animation: `fp-fade-in-up 0.5s ease-out ${0.3 + i * 0.08}s forwards`,
                 }}
               >
-                <DocumentCard id={`${i}`} {...doc} />
+                <DocumentCard {...doc} />
               </li>
             ))}
           </ul>
