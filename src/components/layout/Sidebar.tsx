@@ -67,7 +67,7 @@ export function Sidebar() {
       aria-label="Main navigation"
     >
       {/* User block */}
-      <div className="px-4 pb-2 pt-6">
+      <Link href="/profile" className="block px-4 pb-2 pt-6 transition-opacity hover:opacity-80">
         <div className="flex items-center gap-3">
           {user?.imageUrl ? (
             <img
@@ -87,7 +87,7 @@ export function Sidebar() {
             {user?.fullName ?? user?.firstName ?? ""}
           </span>
         </div>
-      </div>
+      </Link>
 
       {/* Main nav */}
       <nav className="flex flex-1 flex-col p-3" aria-label="Primary">
