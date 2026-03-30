@@ -235,10 +235,16 @@ export default function UploadPage() {
           Upload a file or paste contract text to start your analysis.
         </p>
       </div>
-      <DocumentTypeSelector value={documentType} onChange={setDocumentType}/>
+      <div
+        className="relative z-20 opacity-0"
+        style={{ animation: "fp-fade-in-up 0.6s ease-out 0.15s forwards" }}
+      >
+        <DocumentTypeSelector value={documentType} onChange={setDocumentType}/>
+      </div>
+
       {/* Mode toggle */}
       <div
-        className="mt-8 flex gap-1 rounded-lg bg-navy-850 p-1 opacity-0"
+        className="relative z-10 mt-8 flex gap-1 rounded-lg bg-navy-850 p-1 opacity-0"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.2s forwards" }}
       >
         {(["file", "text"] as const).map((tab) => (
@@ -258,7 +264,7 @@ export default function UploadPage() {
       </div>
 
       <div
-        className="mt-6 flex flex-col gap-6 opacity-0"
+        className="relative z-10 mt-6 flex flex-col gap-6 opacity-0"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.25s forwards" }}
       >
         {mode === "file" ? (
@@ -327,7 +333,7 @@ export default function UploadPage() {
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={isAnalyzing || !documentType}
+            disabled={isAnalyzing}
             className="flex items-center gap-2 rounded-full bg-gold-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-gold-700 hover:shadow-2xl disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {isAnalyzing ? (

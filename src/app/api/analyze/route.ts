@@ -83,12 +83,6 @@ export async function POST(req: NextRequest) {
       if (body.storagePath) {
         // File already in Supabase Storage -- download and extract text
         documentType = body.documentType ?? "";
-        if (!documentType) {
-          return NextResponse.json(
-            { error: "Document type not specified." },
-            { status: 400 },
-          );
-        }
         const supabase = createAdminClient();
         const { data: fileData, error: dlError } = await supabase.storage
           .from("documents")
@@ -129,12 +123,6 @@ export async function POST(req: NextRequest) {
           { status: 400 },
         );
       }
-      if (documentType == "") {
-        return NextResponse.json(
-          { error: "Document type not specified." },
-          { status: 400 },
-        );
-      }
       rawDocumentText = await extractText(file);
     }
 
@@ -142,7 +130,8 @@ export async function POST(req: NextRequest) {
     const { scrubbedText, vault } = anonymizeDocument(rawDocumentText);
 
     // --- 2. GATEKEEPER CHECK (Using Scrubbed Text) ---
-    const gatekeeperPrompt = `You are a lenient document classifier. Determine if the provided text is a legal or contractual document (e.g. lease, contract, agreement, terms of service, policy, NDA, etc.). The user labeled it as "${documentType}" but accept any legal/contractual document regardless of the specific type. Only reject text that is clearly NOT a legal document (e.g. a recipe, a novel, random notes). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
+    const typeHint = documentType ? ` The user labeled it as "${documentType}" but accept` : " Accept";
+    const gatekeeperPrompt = `You are a lenient document classifier. Determine if the provided text is a legal or contractual document (e.g. lease, contract, agreement, terms of service, policy, NDA, etc.).${typeHint} any legal/contractual document regardless of the specific type. Only reject text that is clearly NOT a legal document (e.g. a recipe, a novel, random notes). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
     const verification = await askOpenAI(
       gatekeeperPrompt,
       scrubbedText.substring(0, 3000),
@@ -166,7 +155,8 @@ export async function POST(req: NextRequest) {
       TAXONOMY.map((t) => ({ id: t.id, name: t.name, description: t.description, baseSeverity: t.baseSeverity }))
     );
 
-    const analysisPrompt = `You are an expert legal analyst extracting structured data from a ${documentType}.
+    const docLabel = documentType || "legal document";
+    const analysisPrompt = `You are an expert legal analyst extracting structured data from a ${docLabel}.
 
 You have the following taxonomy of clause categories. Map each risky clause to one or more category ids from this list:
 ${taxonomyJson}
