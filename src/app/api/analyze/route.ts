@@ -186,7 +186,12 @@ async function askOpenAI(
 
     if (!response.ok) {
       const errorBody = await response.text();
-      if (attempt < retries) continue;
+      if (response.status === 413) {
+        alert("This file is too large to process. Please upload a smaller document.");
+      } else {
+        if (attempt < retries) continue;
+        alert(`Server Error: ${errorBody}`);
+      }
       throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
     }
 
@@ -256,7 +261,7 @@ export async function POST(req: NextRequest) {
     const { scrubbedText, vault } = anonymizeDocument(rawDocumentText);
 
     // --- 2. GATEKEEPER CHECK (Using Scrubbed Text) ---
-    const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a legal document (e.g., contract, Terms of Service, Privacy Policy, Lease, NDA). Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
+    const gatekeeperPrompt = `You are a strict document classifier. Determine if the provided text is a ${documentType}. Reply EXACTLY in this JSON format: { "is_legal": boolean, "reason": "brief explanation" }`;
     const verification = await askOpenAI(
       gatekeeperPrompt,
       scrubbedText.substring(0, 3000),
@@ -266,7 +271,7 @@ export async function POST(req: NextRequest) {
     if (!verification.is_legal) {
       return NextResponse.json(
         {
-          error: `This doesn't look like a legal document. AI Reason: ${verification.reason}`,
+          error: `This doesn't look like a legal document. ${verification.reason}  Either select more pages, choose a different document, or change the document type to \"Other\"`,
         },
         { status: 400 },
       );
