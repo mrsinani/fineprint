@@ -106,7 +106,7 @@ export function LandingView() {
             width={120}
             height={96}
             className="mb-6 w-[88px] sm:mb-8 sm:w-[120px]"
-            style={{ height: "auto" }}
+            style={{ width: "auto", height: "auto" }}
             priority
           />
 

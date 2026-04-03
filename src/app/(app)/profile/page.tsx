@@ -52,6 +52,34 @@ export default async function ProfilePage() {
   const clerkImage =
     clerkUser?.imageUrl ?? (row?.image_url as string | null | undefined) ?? null;
 
+  const { data: activeDocs } = await supabase
+    .from("documents")
+    .select("id, page_count")
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+
+  const docIds = (activeDocs ?? []).map((d) => d.id as string);
+  const documentCount = docIds.length;
+  const totalPages = (activeDocs ?? []).reduce(
+    (sum, d) => sum + (Number(d.page_count) || 0),
+    0
+  );
+
+  let analysisCount = 0;
+  if (docIds.length > 0) {
+    const { count } = await supabase
+      .from("analyses")
+      .select("*", { count: "exact", head: true })
+      .in("document_id", docIds);
+    analysisCount = count ?? 0;
+  }
+
+  const { count: trashCount } = await supabase
+    .from("documents")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .not("deleted_at", "is", null);
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
       <ProfileEditor
@@ -60,6 +88,12 @@ export default async function ProfilePage() {
         memberSinceLabel={memberSinceLabel}
         customAvatarUrl={customAvatar}
         clerkImageUrl={clerkImage}
+        stats={{
+          documentCount,
+          totalPages,
+          analysisCount,
+          trashCount: trashCount ?? 0,
+        }}
       />
     </div>
   );

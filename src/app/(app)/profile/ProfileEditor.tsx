@@ -1,8 +1,21 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { updateDisplayName } from "@/app/actions/userProfile";
+import Link from "next/link";
+import { useMemo } from "react";
+import {
+  BarChart3,
+  FileText,
+  Layers,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
+
+export type ProfileStats = {
+  documentCount: number;
+  totalPages: number;
+  analysisCount: number;
+  trashCount: number;
+};
 
 type ProfileEditorProps = {
   initialDisplayName: string;
@@ -10,6 +23,7 @@ type ProfileEditorProps = {
   memberSinceLabel: string;
   customAvatarUrl: string | null;
   clerkImageUrl: string | null;
+  stats: ProfileStats;
 };
 
 function initialsFrom(text: string) {
@@ -23,64 +37,62 @@ function initialsFrom(text: string) {
   return text.slice(0, 2).toUpperCase() || "?";
 }
 
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  href,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  hint?: string;
+  href?: string;
+}) {
+  const inner = (
+    <div className="flex items-start gap-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold-100 text-gold-700">
+        <Icon size={20} strokeWidth={1.75} aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <p className="text-2xl font-semibold tabular-nums text-navy-100">{value}</p>
+        <p className="text-sm font-medium text-navy-300">{label}</p>
+        {hint ? <p className="mt-0.5 text-xs text-navy-500">{hint}</p> : null}
+      </div>
+    </div>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-xl border border-navy-800 bg-white p-4 shadow-sm transition-colors hover:border-gold-500/40 hover:bg-navy-900/5 sm:p-5"
+      >
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-navy-800 bg-white p-4 shadow-sm sm:p-5">{inner}</div>
+  );
+}
+
 export function ProfileEditor({
   initialDisplayName,
   email,
   memberSinceLabel,
   customAvatarUrl,
   clerkImageUrl,
+  stats,
 }: ProfileEditorProps) {
-  const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [displayName, setDisplayName] = useState(initialDisplayName);
-  const [savingName, setSavingName] = useState(false);
-  const [nameMsg, setNameMsg] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(
-    customAvatarUrl || clerkImageUrl
-  );
-  const [uploading, setUploading] = useState(false);
-  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const avatarUrl = customAvatarUrl || clerkImageUrl;
 
   const initials = useMemo(
-    () => initialsFrom(displayName || email || "U"),
-    [displayName, email]
+    () => initialsFrom(initialDisplayName || email || "U"),
+    [initialDisplayName, email]
   );
-
-  async function onSaveName(e: React.FormEvent) {
-    e.preventDefault();
-    setNameMsg(null);
-    setSavingName(true);
-    const res = await updateDisplayName(displayName);
-    setSavingName(false);
-    if ("error" in res && res.error) {
-      setNameMsg(res.error);
-      return;
-    }
-    setNameMsg("Saved.");
-    router.refresh();
-  }
-
-  async function onPickFile(f: FileList | null) {
-    const file = f?.[0];
-    if (!file) return;
-    setUploadErr(null);
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const r = await fetch("/api/profile/avatar", { method: "POST", body: fd });
-      const data = (await r.json()) as { error?: string; publicUrl?: string };
-      if (!r.ok) {
-        setUploadErr(data.error ?? "Upload failed.");
-        return;
-      }
-      if (data.publicUrl) setAvatarUrl(data.publicUrl);
-      router.refresh();
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
 
   return (
     <>
@@ -95,82 +107,69 @@ export function ProfileEditor({
         className="mt-10 rounded-xl border border-navy-800 bg-white p-6 opacity-0 sm:p-8"
         style={{ animation: "fp-fade-in-up 0.6s ease-out 0.2s forwards" }}
       >
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
-          <div className="flex flex-col items-center gap-3 sm:items-start">
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-navy-800 bg-navy-900">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- remote Clerk / Supabase URLs
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gold-500 text-xl font-bold text-white">
-                  {initials}
-                </div>
-              )}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={(e) => onPickFile(e.target.files)}
-            />
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-              className="text-xs font-semibold uppercase tracking-wide text-gold-600 transition-colors hover:text-gold-700 disabled:opacity-50"
-            >
-              {uploading ? "Uploading…" : "Upload photo"}
-            </button>
-            {uploadErr && (
-              <p className="max-w-[200px] text-center text-xs text-fp-red sm:text-left">
-                {uploadErr}
-              </p>
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-navy-800 bg-navy-900">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- remote Clerk / Supabase URLs
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gold-500 text-xl font-bold text-white">
+                {initials}
+              </div>
             )}
-            <p className="max-w-[220px] text-center text-[11px] text-navy-500 sm:text-left">
-              JPEG, PNG, WebP, or GIF · max 2MB. Falls back to initials if you
-              remove your photo in the future.
-            </p>
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-navy-400">{email}</p>
-            <p className="mt-1 text-xs text-navy-500">Member since {memberSinceLabel}</p>
-
-            <form onSubmit={onSaveName} className="mt-8 border-t border-navy-800 pt-8">
-              <label htmlFor="displayName" className="text-xs font-medium uppercase tracking-wide text-navy-400">
-                Display name
-              </label>
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <input
-                  id="displayName"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full max-w-md rounded-lg border border-navy-800 bg-navy-900 px-3 py-2.5 text-sm text-navy-100 outline-none ring-gold-500/30 focus:ring-2"
-                  maxLength={160}
-                  autoComplete="name"
-                />
-                <button
-                  type="submit"
-                  disabled={savingName}
-                  className="shrink-0 rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gold-600 disabled:opacity-60"
-                >
-                  {savingName ? "Saving…" : "Save"}
-                </button>
-              </div>
-              {nameMsg && (
-                <p
-                  className={`mt-2 text-sm ${nameMsg === "Saved." ? "text-fp-emerald" : "text-fp-red"}`}
-                >
-                  {nameMsg}
-                </p>
-              )}
-            </form>
+            <p className="text-lg font-semibold text-navy-100">
+              {initialDisplayName}
+            </p>
+            <p className="mt-1 text-sm text-navy-400">{email}</p>
+            <p className="mt-1 text-xs text-navy-500">
+              Member since {memberSinceLabel}
+            </p>
           </div>
+        </div>
+      </div>
+
+      <div
+        className="mt-8 opacity-0"
+        style={{ animation: "fp-fade-in-up 0.6s ease-out 0.28s forwards" }}
+      >
+        <h2 className="font-display text-lg font-semibold text-navy-100">Your activity</h2>
+        <p className="mt-1 text-sm text-navy-500">
+          Totals from your workspace (active documents only, except trash).
+        </p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            icon={FileText}
+            label="Documents"
+            value={stats.documentCount}
+            hint="In My Documents"
+            href="/documents"
+          />
+          <StatCard
+            icon={Layers}
+            label="Pages reviewed"
+            value={stats.totalPages.toLocaleString()}
+            hint="Sum of page counts"
+          />
+          <StatCard
+            icon={BarChart3}
+            label="AI analyses"
+            value={stats.analysisCount}
+            hint="Completed analysis runs"
+          />
+          <StatCard
+            icon={Trash2}
+            label="In trash"
+            value={stats.trashCount}
+            hint="Recover or delete forever"
+            href="/trash"
+          />
         </div>
       </div>
     </>

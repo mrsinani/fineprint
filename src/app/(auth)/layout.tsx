@@ -16,7 +16,7 @@ export default function AuthLayout({
             width={64}
             height={52}
             className="w-[52px] opacity-0"
-            style={{ height: "auto", animation: "fp-fade-in-up 0.45s ease-out forwards" }}
+            style={{ width: "auto", height: "auto", animation: "fp-fade-in-up 0.45s ease-out forwards" }}
             priority
           />
         </Link>
