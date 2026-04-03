@@ -56,10 +56,22 @@ export function Sidebar() {
   const { user } = useUser();
   const { signOut } = useClerk();
 
-  const initials = [user?.firstName, user?.lastName]
-    .filter(Boolean)
-    .map((n) => n![0].toUpperCase())
-    .join("") || "?";
+  const displayName =
+    user?.fullName?.trim() ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+    user?.primaryEmailAddress?.emailAddress ||
+    "";
+
+  const initials =
+    [user?.firstName?.[0], user?.lastName?.[0]]
+      .filter(Boolean)
+      .join("")
+      .toUpperCase() ||
+    user?.primaryEmailAddress?.emailAddress
+      ?.split("@")[0]
+      ?.slice(0, 2)
+      .toUpperCase() ||
+    "?";
 
   return (
     <aside
@@ -84,7 +96,7 @@ export function Sidebar() {
             </div>
           )}
           <span className="truncate text-sm font-semibold text-navy-100">
-            {user?.fullName ?? user?.firstName ?? ""}
+            {displayName || "Account"}
           </span>
         </div>
       </Link>
@@ -143,7 +155,7 @@ export function Sidebar() {
             className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-navy-400 transition-colors hover:text-navy-200"
           >
             <LogOut size={14} strokeWidth={2} aria-hidden />
-            Sign out
+            Log out
           </button>
         </div>
       </nav>

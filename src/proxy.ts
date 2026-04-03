@@ -1,14 +1,43 @@
+/**
+ * Edge auth for Clerk plus Supabase cookie refresh (`updateSession`).
+ * Next.js 16 uses this file as “Proxy (Middleware)”; keep logic in sync with `src/lib/supabase/middleware.ts`.
+ */
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
-const isPublicRoute = createRouteMatcher(["/", "/api/:path*"]);
+const isAppRoute = createRouteMatcher([
+  "/dashboard(.*)",
+  "/upload(.*)",
+  "/documents(.*)",
+  "/profile(.*)",
+  "/settings(.*)",
+  "/trash(.*)",
+]);
 
-const proxy = clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
+const isAuthRoute = createRouteMatcher([
+  "/login(.*)",
+  "/signup(.*)",
+  "/reset-password(.*)",
+]);
+
+const clerkAuth = clerkMiddleware(async (auth, request) => {
+  const supabaseResponse = await updateSession(request);
+
+  const { userId } = await auth();
+
+  if (isAuthRoute(request) && userId) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (isAppRoute(request)) {
     await auth.protect();
   }
+
+  return supabaseResponse;
 });
 
-export default proxy;
+export default clerkAuth;
 
 export const config = {
   matcher: [
@@ -16,4 +45,3 @@ export const config = {
     "/(api|trpc)(.*)",
   ],
 };
-

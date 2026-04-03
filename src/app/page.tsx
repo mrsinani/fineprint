@@ -38,7 +38,7 @@ export default function LandingPage() {
             </Link>
           </div>
           <Link
-            href="/dashboard"
+            href="/signup"
             className="text-sm font-medium text-white/90 transition-colors hover:text-white"
           >
             Sign Up
@@ -71,7 +71,7 @@ export default function LandingPage() {
           />
 
           <Link
-            href="/dashboard"
+            href="/signup"
             className="mt-6 rounded-full border border-white/40 px-10 py-3 text-sm font-semibold uppercase tracking-[0.15em] text-white transition-all duration-200 hover:border-white/70 hover:bg-white/10"
           >
             Get Started
@@ -120,7 +120,7 @@ export default function LandingPage() {
             &copy; {new Date().getFullYear()} FinePrint
           </p>
           <Link
-            href="/dashboard"
+            href="/signup"
             className="text-sm font-medium text-gold-600 transition-colors hover:text-gold-700"
           >
             Get Started &rarr;
