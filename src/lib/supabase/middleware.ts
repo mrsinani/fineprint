@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Refreshes the Supabase session cookie when using Supabase Auth.
- * App-route access control for signed-in users is handled in `src/middleware.ts` with Clerk.
+ * App-route access control for signed-in users is handled in `src/proxy.ts` with Clerk.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

@@ -191,7 +191,7 @@ export default function ResetPasswordPage() {
       )}
 
       <p className="mt-8 text-center text-sm text-navy-400">
-        <Link href="/login" className="font-medium text-gold-600 hover:text-gold-700">
+        <Link href="/login" className="font-medium text-gold-600 transition-colors hover:text-gold-700">
           Back to sign in
         </Link>
       </p>

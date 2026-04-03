@@ -86,10 +86,13 @@ export function LandingView() {
               How It Works
             </a>
           </div>
-          <div className="flex justify-center sm:justify-end">
+          <div className="flex items-center justify-center gap-x-5 sm:justify-end">
+            <Link href="/login" className={navLinkClass}>
+              Sign In
+            </Link>
             <Link
               href="/signup"
-              className={`${navLinkClass} whitespace-nowrap rounded-full border border-white/25 px-4 py-1.5 hover:border-white/50 hover:bg-white/10 sm:border-0 sm:px-0 sm:py-0 sm:hover:bg-transparent`}
+              className="whitespace-nowrap rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:border-white/50 hover:bg-white/20"
             >
               Sign Up
             </Link>
@@ -102,7 +105,8 @@ export function LandingView() {
             alt="FinePrint owl logo"
             width={120}
             height={96}
-            className="mb-6 h-auto w-[88px] sm:mb-8 sm:w-[120px]"
+            className="mb-6 w-[88px] sm:mb-8 sm:w-[120px]"
+            style={{ height: "auto" }}
             priority
           />
 
@@ -136,7 +140,7 @@ export function LandingView() {
       >
         <div className="mx-auto max-w-4xl">
           <Reveal>
-            <h2 className="text-center text-3xl font-light text-navy-300 sm:text-right sm:text-4xl">
+            <h2 className="text-center text-3xl font-light text-navy-300 sm:text-4xl">
               What we do
             </h2>
           </Reveal>

@@ -1,9 +1,25 @@
 import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   return (
     <div>
+      {error && (
+        <p
+          className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-fp-red"
+          role="alert"
+        >
+          {error === "auth"
+            ? "Authentication failed. Please sign in again."
+            : "Something went wrong. Please try again."}
+        </p>
+      )}
       <SignIn
         routing="path"
         path="/login"

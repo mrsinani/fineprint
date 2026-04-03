@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider appearance={clerkAppearance}>
-      <html lang="en">
+      <html lang="en" data-scroll-behavior="smooth">
         <body className={`${outfit.variable} antialiased`}>
           {children}
         </body>
