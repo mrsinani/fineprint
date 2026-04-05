@@ -39,8 +39,6 @@ async function askOpenAI(
       const errorBody = await response.text();
       if (response.status === 413) {
         throw new Error("This file is too large to process. Please upload a smaller document.");
-      } else {
-        if (attempt < retries) continue;
       }
       throw new Error(`OpenAI API error: ${response.status} ${errorBody}`);
     }

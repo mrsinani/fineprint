@@ -4,9 +4,31 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureUserExists } from "@/lib/ensureUserExists";
+import { ChatBubble } from "@/components/chat/ChatBubble";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+interface AnalysisSummary {
+  overview?: string;
+  plain_english?: string[];
+}
+
+interface AnalysisClause {
+  id?: string;
+  severity?: string;
+  section?: string;
+  explanation?: string;
+  quote?: string;
+  recommendation?: string;
+  triggered_features?: string[];
+}
+
+interface AnalysisActionItem {
+  title?: string;
+  description?: string;
+  priority?: string;
 }
 
 export default async function DocumentDetailPage({ params }: Props) {
@@ -36,11 +58,9 @@ export default async function DocumentDetailPage({ params }: Props) {
     .single();
 
   const riskScore = analysis?.overall_risk_score ?? doc.overall_risk_score;
-  const summary = analysis?.summary as
-    | { overview?: string; plain_english?: string[] }
-    | null;
-  const clauses = analysis?.clauses as any[] | null;
-  const actionItems = analysis?.action_items as any[] | null;
+  const summary = analysis?.summary as AnalysisSummary | null;
+  const clauses = analysis?.clauses as AnalysisClause[] | null;
+  const actionItems = analysis?.action_items as AnalysisActionItem[] | null;
 
   const createdAt = new Date(doc.created_at as string).toLocaleDateString(
     "en-US",
@@ -48,7 +68,8 @@ export default async function DocumentDetailPage({ params }: Props) {
   );
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-12 pb-32">
+    <>
+      <div className="mx-auto max-w-3xl px-8 py-12 pb-32">
       {/* Back link */}
       <div
         className="opacity-0"
@@ -165,7 +186,7 @@ export default async function DocumentDetailPage({ params }: Props) {
             </h3>
             <div className="space-y-4">
               {Array.isArray(clauses) && clauses.length > 0 ? (
-                clauses.map((clause: any, i: number) => {
+                clauses.map((clause: AnalysisClause, i: number) => {
                   const sev = clause.severity;
                   const badgeColors =
                     sev === "HIGH"
@@ -242,7 +263,7 @@ export default async function DocumentDetailPage({ params }: Props) {
                 Action Items
               </h3>
               <div className="space-y-4">
-                {actionItems.map((item: any, i: number) => {
+                  {actionItems.map((item: AnalysisActionItem, i: number) => {
                   const prio = item.priority;
                   const prioBadge =
                     prio === "HIGH"
@@ -277,6 +298,9 @@ export default async function DocumentDetailPage({ params }: Props) {
           )}
         </div>
       )}
-    </div>
+      </div>
+
+      <ChatBubble documentId={id} />
+    </>
   );
 }
