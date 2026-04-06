@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { anonymizeDocument } from "@/app/utils/anonymize";
 import { deanonymizeText } from "@/app/utils/anonymize";
 import { TAXONOMY } from "@/lib/taxonomy";
@@ -7,6 +8,7 @@ import { extractText } from "@/lib/extractText";
 import { extractTextFromBuffer } from "@/lib/extractText";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUser } from "@/lib/auth";
+import type { UserSensitivityPreferences } from "@/lib/sensitivity";
 
 // --- OpenAI Fetch Helper ---
 async function askOpenAI(
@@ -259,8 +261,32 @@ Rules:
     }
 
     rawResult.clauses = clauses;
+
+    // Fetch user sensitivity preferences for personalized scoring
+    let sensitivityPrefs: UserSensitivityPreferences | undefined;
+    const { userId } = await auth();
+    if (userId) {
+      const supabase = createAdminClient();
+      const { data: userData } = await supabase
+        .from("users")
+        .select("sensitivity_preferences")
+        .eq("id", userId)
+        .single();
+      if (
+        userData?.sensitivity_preferences &&
+        typeof userData.sensitivity_preferences === "object"
+      ) {
+        sensitivityPrefs =
+          userData.sensitivity_preferences as UserSensitivityPreferences;
+      }
+    }
+
     rawResult.overall_risk_score = computeDocumentScore(
-      clauses.map((c) => ({ severity: c.severity as "HIGH" | "MEDIUM" | "LOW" }))
+      clauses.map((c) => ({
+        severity: c.severity as "HIGH" | "MEDIUM" | "LOW",
+        category: c.category,
+      })),
+      sensitivityPrefs,
     );
 
     // --- 6. DE-ANONYMIZE AND RETURN ---

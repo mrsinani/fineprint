@@ -1,4 +1,8 @@
 import { TAXONOMY } from "./taxonomy";
+import {
+  getSensitivityMultiplier,
+  type UserSensitivityPreferences,
+} from "./sensitivity";
 
 type Severity = "HIGH" | "MEDIUM" | "LOW";
 
@@ -88,16 +92,22 @@ export function computeClauseSeverity(clause: {
   return { severity: tierToSeverity[tier], triggered_features };
 }
 
-export function computeDocumentScore(clauses: { severity: Severity }[]): number {
-  let highCount = 0;
-  let medCount = 0;
-  let lowCount = 0;
+const SEVERITY_POINTS: Record<Severity, number> = { HIGH: 18, MEDIUM: 7, LOW: 2 };
+
+export function computeDocumentScore(
+  clauses: { severity: Severity; category?: string[] }[],
+  sensitivityPrefs?: UserSensitivityPreferences,
+): number {
+  let score = 0;
 
   for (const clause of clauses) {
-    if (clause.severity === "HIGH") highCount++;
-    else if (clause.severity === "MEDIUM") medCount++;
-    else lowCount++;
+    const base = SEVERITY_POINTS[clause.severity];
+    const multiplier =
+      sensitivityPrefs && clause.category?.length
+        ? getSensitivityMultiplier(clause.category, sensitivityPrefs)
+        : 1.0;
+    score += base * multiplier;
   }
 
-  return Math.min(highCount * 18 + medCount * 7 + lowCount * 2, 100);
+  return Math.min(Math.round(score), 100);
 }

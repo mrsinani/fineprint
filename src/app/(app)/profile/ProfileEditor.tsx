@@ -7,8 +7,15 @@ import {
   FileText,
   Layers,
   Trash2,
+  SlidersHorizontal,
+  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
+import {
+  SENSITIVITY_CATEGORIES,
+  type SensitivityLevel,
+  type UserSensitivityPreferences,
+} from "@/lib/sensitivity";
 
 export type ProfileStats = {
   documentCount: number;
@@ -24,6 +31,7 @@ type ProfileEditorProps = {
   customAvatarUrl: string | null;
   clerkImageUrl: string | null;
   stats: ProfileStats;
+  sensitivityPreferences: UserSensitivityPreferences | null;
 };
 
 function initialsFrom(text: string) {
@@ -79,6 +87,14 @@ function StatCard({
   );
 }
 
+const LEVEL_BADGE: Record<SensitivityLevel, { label: string; className: string }> = {
+  VERY_LOW: { label: "Don't Care", className: "bg-navy-900 text-navy-500" },
+  LOW: { label: "Not Really", className: "bg-navy-850 text-navy-400" },
+  MEDIUM: { label: "Neutral", className: "bg-gold-100 text-gold-700" },
+  HIGH: { label: "Care", className: "bg-red-50 text-fp-red" },
+  VERY_HIGH: { label: "Care A Lot", className: "bg-fp-red/10 text-fp-red" },
+};
+
 export function ProfileEditor({
   initialDisplayName,
   email,
@@ -86,6 +102,7 @@ export function ProfileEditor({
   customAvatarUrl,
   clerkImageUrl,
   stats,
+  sensitivityPreferences,
 }: ProfileEditorProps) {
   const avatarUrl = customAvatarUrl || clerkImageUrl;
 
@@ -171,6 +188,84 @@ export function ProfileEditor({
             href="/trash"
           />
         </div>
+      </div>
+
+      {/* Sensitivity preferences */}
+      <div
+        className="mt-8 opacity-0"
+        style={{ animation: "fp-fade-in-up 0.6s ease-out 0.36s forwards" }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-navy-100">
+              Sensitivity preferences
+            </h2>
+            <p className="mt-1 text-sm text-navy-500">
+              How sensitive you are to different types of clauses — used to
+              personalize your risk scores.
+            </p>
+          </div>
+          <Link
+            href="/onboarding"
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-navy-700 px-4 py-2.5 text-sm font-semibold text-navy-200 transition-colors hover:border-gold-500 hover:text-gold-700"
+          >
+            <RotateCcw size={14} strokeWidth={2} />
+            {sensitivityPreferences &&
+            Object.keys(sensitivityPreferences).length > 0
+              ? "Edit preferences"
+              : "Set up now"}
+          </Link>
+        </div>
+
+        {sensitivityPreferences &&
+        Object.keys(sensitivityPreferences).length > 0 ? (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {SENSITIVITY_CATEGORIES.map((cat) => {
+              const level =
+                (sensitivityPreferences[cat.id] as SensitivityLevel) ??
+                "MEDIUM";
+              const badge = LEVEL_BADGE[level];
+              return (
+                <div
+                  key={cat.id}
+                  className="flex items-center justify-between rounded-xl border border-navy-800 bg-white px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-navy-200">
+                      {cat.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-navy-500">
+                      {cat.question}
+                    </p>
+                  </div>
+                  <span
+                    className={`ml-3 shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${badge.className}`}
+                  >
+                    {badge.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-dashed border-navy-700 bg-navy-900/50 px-6 py-8 text-center">
+            <SlidersHorizontal
+              size={28}
+              strokeWidth={1.5}
+              className="mx-auto text-navy-600"
+            />
+            <p className="mt-3 text-sm text-navy-400">
+              You haven&apos;t set up your sensitivity preferences yet. This
+              helps us personalize risk scores to what matters most to you.
+            </p>
+            <Link
+              href="/onboarding"
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-gold-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gold-700"
+            >
+              Get started
+            </Link>
+          </div>
+        )}
       </div>
     </>
   );
