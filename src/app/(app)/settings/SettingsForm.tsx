@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Trash2, SlidersHorizontal } from "lucide-react";
 
 export function SettingsForm() {
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -36,6 +37,27 @@ export function SettingsForm() {
       </h1>
 
       <div className="mt-10 flex flex-col gap-8">
+        {/* Sensitivity preferences */}
+        <section
+          className="rounded-xl border border-navy-800 bg-white p-6 opacity-0 sm:p-8"
+          style={{ animation: "fp-fade-in-up 0.6s ease-out 0.12s forwards" }}
+        >
+          <div className="flex items-center gap-2 text-navy-200">
+            <SlidersHorizontal size={20} strokeWidth={1.75} aria-hidden />
+            <h2 className="font-display text-lg font-semibold">Sensitivity preferences</h2>
+          </div>
+          <p className="mt-2 text-sm text-navy-500">
+            Adjust how sensitive you are to different types of clauses. This
+            personalizes your risk scores.
+          </p>
+          <Link
+            href="/onboarding"
+            className="mt-5 inline-flex items-center gap-2 rounded-lg border border-navy-700 px-4 py-2.5 text-sm font-semibold text-navy-200 transition-colors hover:border-gold-500 hover:text-gold-700"
+          >
+            Edit preferences
+          </Link>
+        </section>
+
         {/* Danger zone */}
         <section
           className="rounded-xl border border-fp-red/30 bg-white p-6 opacity-0 sm:p-8"

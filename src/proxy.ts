@@ -13,6 +13,7 @@ const isAppRoute = createRouteMatcher([
   "/profile(.*)",
   "/settings(.*)",
   "/trash(.*)",
+  "/onboarding(.*)",
 ]);
 
 const isAuthRoute = createRouteMatcher([
