@@ -86,10 +86,11 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Data Sharing</h2>
             <p>
               We do not sell, rent, or trade your personal information to third parties. Page
-              content submitted for analysis is processed by our AI service to generate results
-              and is not shared with unrelated third parties. We may use third-party service
-              providers (hosting, authentication, database) that process data on our behalf
-              under strict confidentiality obligations.
+              content submitted for analysis is sent to OpenAI's API to generate results.
+              OpenAI's API data usage policy states that data sent through the API is not used
+              to train their models. We do not use your data to train any AI models. We may
+              use third-party service providers (hosting, authentication, database) that process
+              data on our behalf under strict confidentiality obligations.
             </p>
           </section>
 
