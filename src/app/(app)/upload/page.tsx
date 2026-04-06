@@ -16,6 +16,7 @@ const DocumentPreview = dynamic(
 
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
+type ApiError = { error?: string };
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -30,10 +31,21 @@ async function uploadToStorage(file: File): Promise<{ storagePath: string; docId
     body: JSON.stringify({ fileName: file.name, fileType: file.type }),
   });
   if (!signRes.ok) {
-    const err = await signRes.json().catch(() => ({ error: "Failed to get upload URL" }));
-    throw new Error(err.error);
+    const errorText = await signRes.text();
+    try {
+      const err = JSON.parse(errorText) as { error?: string };
+      throw new Error(err.error || "Failed to get upload URL");
+    } catch {
+      throw new Error(
+        `Failed to get upload URL (${signRes.status}): ${errorText.slice(0, 180) || "Unknown server error"}`,
+      );
+    }
   }
   const { signedUrl, token, storagePath, docId } = await signRes.json();
+
+  if (!signedUrl || !token || !storagePath || !docId) {
+    throw new Error("Upload signing response was incomplete.");
+  }
 
   const supabase = createClient();
   const { error } = await supabase.storage
@@ -45,6 +57,15 @@ async function uploadToStorage(file: File): Promise<{ storagePath: string; docId
   return { storagePath, docId };
 }
 
+function readApiError(data: unknown): string | null {
+  if (data && typeof data === "object" && "error" in data) {
+    const value = (data as ApiError).error;
+    return typeof value === "string" ? value : null;
+  }
+
+  return null;
+}
+
 export default function UploadPage() {
   const [mode, setMode] = useState<InputMode>("file");
 
@@ -52,7 +73,7 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [analysisFile, setAnalysisFile] = useState<File | null>(null);
   const [fileStatus, setFileStatus] = useState<UploadStatus>("pending");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl] = useState<string | null>(null);
 
   // Tracking PDF Pages
   const [excludedPages, setExcludedPages] = useState<number[]>([]);
@@ -96,12 +117,9 @@ export default function UploadPage() {
       }
       
       const modifiedBytes = await pdfDoc.save();
-      
-      const modifiedFile = new File(
-        [modifiedBytes as any], 
-        file.name, 
-        { type: file.type }
-      );
+      const fileBytes = new Uint8Array(modifiedBytes);
+
+      const modifiedFile = new File([fileBytes], file.name, { type: file.type });
       
       setAnalysisFile(modifiedFile);
     };
@@ -156,14 +174,14 @@ export default function UploadPage() {
         });
 
         const analyzeText = await analyzeRes.text();
-        let data: Record<string, any>;
+        let data: unknown;
         try {
           data = JSON.parse(analyzeText);
         } catch {
           throw new Error(`Server error (${analyzeRes.status}): ${analyzeText.slice(0, 120)}`);
         }
         if (!analyzeRes.ok) {
-          throw new Error(data.error || `Analysis error: ${analyzeRes.status}`);
+          throw new Error(readApiError(data) || `Analysis error: ${analyzeRes.status}`);
         }
 
         // 3. Save document + analysis to database (small JSON payload)
@@ -199,14 +217,14 @@ export default function UploadPage() {
         });
 
         const responseText = await response.text();
-        let data: Record<string, any>;
+        let data: unknown;
         try {
           data = JSON.parse(responseText);
         } catch {
           throw new Error(`Server error (${response.status}): ${responseText.slice(0, 120)}`);
         }
         if (!response.ok) {
-          throw new Error(data.error || `Server error: ${response.status}`);
+          throw new Error(readApiError(data) || `Server error: ${response.status}`);
         }
       }
     } catch (error) {
