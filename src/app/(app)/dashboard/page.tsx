@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureUserExists } from "@/lib/ensureUserExists";
 import {
@@ -10,6 +11,16 @@ export default async function DashboardPage() {
   const { userId } = await auth();
   await ensureUserExists(userId!);
   const supabase = createAdminClient();
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("onboarding_completed")
+    .eq("id", userId!)
+    .single();
+
+  if (!user?.onboarding_completed) {
+    redirect("/onboarding");
+  }
 
   const { data: rows } = await supabase
     .from("documents")

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureUserExists } from "@/lib/ensureUserExists";
 import { getAvatarPublicUrl } from "@/lib/avatarPublicUrl";
+import type { UserSensitivityPreferences } from "@/lib/sensitivity";
 import { ProfileEditor } from "./ProfileEditor";
 
 function defaultDisplayName(
@@ -94,6 +95,9 @@ export default async function ProfilePage() {
           analysisCount,
           trashCount: trashCount ?? 0,
         }}
+        sensitivityPreferences={
+          (row?.sensitivity_preferences as UserSensitivityPreferences) ?? null
+        }
       />
     </div>
   );
