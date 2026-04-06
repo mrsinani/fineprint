@@ -1,9 +1,6 @@
 import type { AnalyzeApiResponse, ExtensionSaveResponse } from "@shared/types";
 
-const API_BASE =
-  import.meta.env.MODE === "development"
-    ? "http://localhost:3001"
-    : "https://fineprint.dev";
+const API_BASE = "https://fineprint.dev";
 
 async function getToken(): Promise<string | null> {
   const result = await chrome.storage.local.get("fp_token");

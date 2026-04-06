@@ -9,49 +9,64 @@ if (!(window as unknown as Record<string, boolean>).__fineprint_loaded) {
 }
 
 function init() {
-  const fab = new FloatingButton();
-  const overlay = new ResultsOverlay();
+  let fab: FloatingButton | null = null;
+  let overlay: ResultsOverlay | null = null;
   let currentText = "";
 
-  // Run detection
   const detection = detectTermsOfService();
   if (detection.isToS) {
+    ({ fab, overlay } = createUI());
     fab.setState("detected");
   }
 
-  fab.setOnClick(async () => {
-    const state = fab.getState();
+  function createUI() {
+    if (fab && overlay) return { fab, overlay };
 
-    if (state === "done" || state === "error") {
-      overlay.toggle();
-      return;
+    const f = new FloatingButton();
+    const o = new ResultsOverlay();
+
+    o.setOnToggle((open) => f.setOverlayOpen(open));
+    o.setOnSave(async (data) => {
+      o.setSaveState("saving");
+      const response = await sendMessage({ type: "SAVE_ANALYSIS", payload: data });
+      if (response?.type === "SAVE_RESULT") {
+        const { appUrl } = response.payload as { id: string; appUrl: string };
+        o.setSaveState("saved", appUrl);
+      } else {
+        o.setSaveState("error");
+      }
+    });
+
+    f.setOnClick(() => runAnalysis());
+
+    return { fab: f, overlay: o };
+  }
+
+  async function runAnalysis() {
+    if (!fab || !overlay) {
+      ({ fab, overlay } = createUI());
     }
 
+    const state = fab!.getState();
+    if (state === "done" || state === "error") {
+      overlay!.toggle();
+      return;
+    }
     if (state === "analyzing") return;
 
-    // Check auth first
     const authResponse = await sendMessage({ type: "GET_AUTH_STATUS" });
     if (!authResponse?.payload?.authenticated) {
-      const authUrl =
-        import.meta.env.MODE === "development"
-          ? "http://localhost:3001/extension/auth"
-          : "https://fineprint.dev/extension/auth";
-      window.open(authUrl, "_blank");
+      window.open("https://fineprint.dev/extension/auth", "_blank");
       return;
     }
 
-    // Extract text and analyze
-    fab.setState("analyzing");
+    fab!.setState("analyzing");
     currentText = extractMainContent();
     const title = detection.title || document.title || window.location.hostname;
 
     const response = await sendMessage({
       type: "ANALYZE_PAGE",
-      payload: {
-        text: currentText,
-        title,
-        url: window.location.href,
-      },
+      payload: { text: currentText, title, url: window.location.href },
     });
 
     if (response?.type === "ANALYSIS_RESULT") {
@@ -60,32 +75,20 @@ function init() {
         title: string;
         url: string;
       };
-      fab.setState("done", result.overall_risk_score);
-      overlay.show(result, title, window.location.href, currentText);
+      fab!.setState("done", result.overall_risk_score);
+      overlay!.show(result, title, window.location.href, currentText);
     } else {
       const errorMsg = (response?.payload as { error?: string })?.error ?? "Analysis failed";
-      fab.setState("error", undefined, errorMsg);
-      overlay.showError(errorMsg, window.location.href);
+      fab!.setState("error", undefined, errorMsg);
+      overlay!.showError(errorMsg, window.location.href);
     }
-  });
+  }
 
-  overlay.setOnToggle((open) => {
-    fab.setOverlayOpen(open);
-  });
-
-  overlay.setOnSave(async (data) => {
-    overlay.setSaveState("saving");
-
-    const response = await sendMessage({
-      type: "SAVE_ANALYSIS",
-      payload: data,
-    });
-
-    if (response?.type === "SAVE_RESULT") {
-      const { appUrl } = response.payload as { id: string; appUrl: string };
-      overlay.setSaveState("saved", appUrl);
-    } else {
-      overlay.setSaveState("error");
+  // Listen for manual trigger from the popup
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.type === "TRIGGER_ANALYSIS") {
+      runAnalysis();
+      sendResponse({ ok: true });
     }
   });
 

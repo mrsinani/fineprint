@@ -1,12 +1,10 @@
-const API_BASE =
-  import.meta.env.MODE === "development"
-    ? "http://localhost:3001"
-    : "https://fineprint.dev";
+const API_BASE = "https://fineprint.dev";
 
 const signedOutEl = document.getElementById("signed-out")!;
 const signedInEl = document.getElementById("signed-in")!;
 const signInBtn = document.getElementById("sign-in-btn")!;
 const signOutBtn = document.getElementById("sign-out-btn")!;
+const analyzeBtn = document.getElementById("analyze-btn")!;
 const userAvatar = document.getElementById("user-avatar") as HTMLDivElement;
 const userName = document.getElementById("user-name")!;
 const userEmail = document.getElementById("user-email")!;
@@ -66,6 +64,13 @@ async function loadSettings() {
 
 signInBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: `${API_BASE}/extension/auth` });
+  window.close();
+});
+
+analyzeBtn.addEventListener("click", async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  chrome.tabs.sendMessage(tab.id, { type: "TRIGGER_ANALYSIS" });
   window.close();
 });
 

@@ -22,10 +22,13 @@
   "content_scripts": [
     {
       "js": [
-        "assets/index.ts-7RXbke4j.js"
+        "assets/index.ts-y--Zjtkj.js"
       ],
       "matches": [
         "<all_urls>"
+      ],
+      "exclude_matches": [
+        "https://fineprint.dev/*"
       ],
       "css": [],
       "run_at": "document_idle"
@@ -51,7 +54,7 @@
         "<all_urls>"
       ],
       "resources": [
-        "assets/index.ts-7RXbke4j.js"
+        "assets/index.ts-y--Zjtkj.js"
       ],
       "use_dynamic_url": false
     }
