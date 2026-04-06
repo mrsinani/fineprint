@@ -33,7 +33,7 @@ if (fs.existsSync(zipPath)) {
 console.log("\nBuilding (icons + TypeScript + Vite)…\n");
 run("npm run build");
 
-console.log("\nPackaging ZIP…\n");
-run(`node "${path.join(__dirname, "zip-dist.mjs")}"`);
+// console.log("\nPackaging ZIP…\n");
+// run(`node "${path.join(__dirname, "zip-dist.mjs")}"`);
 
-console.log("\nDone. Upload extension/fineprint-extension.zip or load extension/dist in Chrome.");
+console.log("\nDone. Load extension/dist in Chrome.");

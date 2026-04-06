@@ -286,6 +286,46 @@ const OVERLAY_STYLES = `
     text-align: center;
     padding: 8px;
   }
+
+  .fp-error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    text-align: center;
+    flex: 1;
+  }
+
+  .fp-error-icon {
+    width: 48px;
+    height: 48px;
+    color: #dc2626;
+    margin-bottom: 16px;
+  }
+
+  .fp-error-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a2030;
+    margin: 0 0 12px 0;
+  }
+
+  .fp-error-message {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #4a5464;
+    margin: 0 0 24px 0;
+    max-width: 340px;
+  }
+
+  .fp-error-context {
+    font-size: 12px;
+    color: #8b95a5;
+    word-break: break-all;
+    margin: 0;
+    max-width: 340px;
+  }
 `;
 
 const CLOSE_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
@@ -295,6 +335,7 @@ export class ResultsOverlay {
   private panel: HTMLDivElement;
   private isOpen = false;
   private analysisData: AnalyzeApiResponse | null = null;
+  private lastError: string | null = null;
   private pageTitle = "";
   private pageUrl = "";
   private pageText = "";
@@ -334,12 +375,29 @@ export class ResultsOverlay {
 
   show(result: AnalyzeApiResponse, title: string, url: string, text: string) {
     this.analysisData = result;
+    this.lastError = null;
     this.pageTitle = title;
     this.pageUrl = url;
     this.pageText = text;
     this.saveState = "idle";
     this.savedAppUrl = null;
     this.render();
+    requestAnimationFrame(() => {
+      this.panel.classList.add("fp-overlay--open");
+      this.isOpen = true;
+      this.onToggle?.(true);
+    });
+  }
+
+  showError(errorMessage: string, url: string) {
+    this.analysisData = null;
+    this.lastError = errorMessage;
+    this.pageTitle = "";
+    this.pageUrl = url;
+    this.pageText = "";
+    this.saveState = "idle";
+    this.savedAppUrl = null;
+    this.renderError(errorMessage);
     requestAnimationFrame(() => {
       this.panel.classList.add("fp-overlay--open");
       this.isOpen = true;
@@ -354,8 +412,13 @@ export class ResultsOverlay {
   }
 
   toggle() {
-    if (this.isOpen) this.hide();
-    else if (this.analysisData) this.show(this.analysisData, this.pageTitle, this.pageUrl, this.pageText);
+    if (this.isOpen) {
+      this.hide();
+    } else if (this.analysisData) {
+      this.show(this.analysisData, this.pageTitle, this.pageUrl, this.pageText);
+    } else if (this.lastError) {
+      this.showError(this.lastError, this.pageUrl);
+    }
   }
 
   isVisible() {
@@ -366,6 +429,43 @@ export class ResultsOverlay {
     this.saveState = state;
     if (appUrl) this.savedAppUrl = appUrl;
     this.renderFooter();
+  }
+
+  private renderError(errorMessage: string) {
+    this.panel.innerHTML = "";
+
+    const style = document.createElement("style");
+    style.textContent = OVERLAY_STYLES;
+    this.panel.appendChild(style);
+
+    const header = document.createElement("div");
+    header.className = "fp-header";
+    header.innerHTML = `
+      <div class="fp-header-left">
+        <h2 class="fp-title">FinePrint</h2>
+        <div class="fp-subtitle">Analysis Error</div>
+      </div>
+    `;
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "fp-close";
+    closeBtn.innerHTML = CLOSE_SVG;
+    closeBtn.addEventListener("click", () => this.hide());
+    header.appendChild(closeBtn);
+    this.panel.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "fp-error-container";
+
+    const errorIcon = `<svg class="fp-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
+    body.innerHTML = `
+      ${errorIcon}
+      <h3 class="fp-error-title">Couldn't analyze this page</h3>
+      <p class="fp-error-message">${escapeHtml(errorMessage)}</p>
+      ${this.pageUrl ? `<p class="fp-error-context">${escapeHtml(this.pageUrl)}</p>` : ""}
+    `;
+
+    this.panel.appendChild(body);
   }
 
   private render() {

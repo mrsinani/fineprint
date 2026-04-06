@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { anonymizeDocument } from "@/app/utils/anonymize";
 import { deanonymizeText } from "@/app/utils/anonymize";
 import { TAXONOMY } from "@/lib/taxonomy";
@@ -264,8 +263,7 @@ Rules:
 
     // Fetch user sensitivity preferences for personalized scoring
     let sensitivityPrefs: UserSensitivityPreferences | undefined;
-    const { userId } = await auth();
-    if (userId) {
+    {
       const supabase = createAdminClient();
       const { data: userData } = await supabase
         .from("users")

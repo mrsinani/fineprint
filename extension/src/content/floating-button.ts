@@ -105,6 +105,7 @@ export class FloatingButton {
   private state: ButtonState = "idle";
   private onClick: (() => void) | null = null;
   private riskScore: number | null = null;
+  private errorMessage: string | null = null;
 
   constructor() {
     const host = document.createElement("div");
@@ -133,9 +134,10 @@ export class FloatingButton {
     (this.shadow.host as HTMLElement).style.right = open ? "444px" : "24px";
   }
 
-  setState(state: ButtonState, riskScore?: number) {
+  setState(state: ButtonState, riskScore?: number, errorMessage?: string) {
     this.state = state;
     if (riskScore !== undefined) this.riskScore = riskScore;
+    this.errorMessage = errorMessage ?? null;
     this.render();
   }
 
@@ -171,14 +173,36 @@ export class FloatingButton {
         this.button.setAttribute("aria-label", "Analysis complete - click to view");
         break;
 
-      case "error":
-        this.button.innerHTML = `${ALERT_SVG}<span>Analysis failed</span>`;
-        this.button.setAttribute("aria-label", "Analysis failed - click to retry");
+      case "error": {
+        const label = this.errorMessage
+          ? truncate(this.errorMessage, 50)
+          : "Analysis failed";
+        this.button.innerHTML = `${ALERT_SVG}<span>${escapeHtml(label)}</span>`;
+        this.button.setAttribute("aria-label", this.errorMessage ?? "Analysis failed - click to retry");
         break;
+      }
     }
+  }
+
+  getErrorMessage(): string | null {
+    return this.errorMessage;
   }
 
   destroy() {
     this.shadow.host.remove();
   }
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function truncate(str: string, max: number): string {
+  if (str.length <= max) return str;
+  const end = str.lastIndexOf(" ", max);
+  return str.slice(0, end > 0 ? end : max) + "…";
 }

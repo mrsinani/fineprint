@@ -22,7 +22,7 @@ function init() {
   fab.setOnClick(async () => {
     const state = fab.getState();
 
-    if (state === "done") {
+    if (state === "done" || state === "error") {
       overlay.toggle();
       return;
     }
@@ -63,9 +63,9 @@ function init() {
       fab.setState("done", result.overall_risk_score);
       overlay.show(result, title, window.location.href, currentText);
     } else {
-      fab.setState("error");
       const errorMsg = (response?.payload as { error?: string })?.error ?? "Analysis failed";
-      console.error("[FinePrint]", errorMsg);
+      fab.setState("error", undefined, errorMsg);
+      overlay.showError(errorMsg, window.location.href);
     }
   });
 
