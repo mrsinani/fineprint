@@ -6,6 +6,7 @@ import { computeClauseSeverity, computeDocumentScore } from "@/lib/scoring";
 import { extractText } from "@/lib/extractText";
 import { extractTextFromBuffer } from "@/lib/extractText";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 // --- OpenAI Fetch Helper ---
 async function askOpenAI(
@@ -62,6 +63,11 @@ async function askOpenAI(
 }
 
 export async function POST(req: NextRequest) {
+  const { userId } = await getAuthenticatedUser(req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let documentType = "";
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

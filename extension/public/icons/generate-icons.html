@@ -1,0 +1,26 @@
+<!--
+  Placeholder: generate proper icons from the FinePrint logo.
+  For now, use SVG-based placeholders during development.
+  Run this file in a browser, right-click each canvas, and save as PNG.
+-->
+<canvas id="c16" width="16" height="16"></canvas>
+<canvas id="c48" width="48" height="48"></canvas>
+<canvas id="c128" width="128" height="128"></canvas>
+<script>
+  function draw(id, size) {
+    const c = document.getElementById(id).getContext('2d');
+    const pad = size * 0.15;
+    c.fillStyle = '#14b8a6';
+    c.beginPath();
+    c.roundRect(0, 0, size, size, size * 0.2);
+    c.fill();
+    c.fillStyle = '#fff';
+    c.font = `bold ${size * 0.5}px system-ui`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('FP', size/2, size/2 + size*0.03);
+  }
+  draw('c16', 16);
+  draw('c48', 48);
+  draw('c128', 128);
+</script>

@@ -6,7 +6,9 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "extension": "npm run extension --prefix extension",
+    "extension:dev": "cd extension && npm run build -- --mode development && node scripts/zip-dist.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.7",

@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ChevronLeft, FileText, ListChecks, ShieldAlert } from "lucide-react";
 import { getLocalDocumentAnalysisById } from "@/components/analysis/data";
 import { ActionItemsTab } from "@/components/analysis/ActionItemsTab";
-import { RiskHeatmapView } from "@/components/analysis/RiskHeatmapView";
 import { RiskOverviewTab } from "@/components/analysis/RiskOverviewTab";
 import { SummaryTab } from "@/components/analysis/SummaryTab";
 import type { DocumentAnalysisPageData } from "@/components/analysis/types";
+
+const RiskHeatmapView = dynamic(
+  () => import("@/components/analysis/RiskHeatmapView").then((m) => m.RiskHeatmapView),
+  { ssr: false, loading: () => <div className="py-12 text-center text-sm text-navy-400">Loading heatmap...</div> },
+);
 
 type MainTab = "summary" | "risk" | "actions";
 type RiskView = "overview" | "heatmap";
