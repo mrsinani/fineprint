@@ -1,5 +1,5 @@
 import { DocumentAnalysisShell } from "@/components/analysis/DocumentAnalysisShell";
-import { getDocumentAnalysisById } from "@/components/analysis/data";
+import { getDocumentAnalysisForPreview } from "@/components/analysis/loadDocumentAnalysis.server";
 
 export default async function DocumentAnalysisPage({
   params,
@@ -7,7 +7,7 @@ export default async function DocumentAnalysisPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const document = await getDocumentAnalysisById(id);
+  const document = await getDocumentAnalysisForPreview(id, null);
 
   return <DocumentAnalysisShell initialDocument={document} />;
 }

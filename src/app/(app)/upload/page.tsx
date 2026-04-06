@@ -117,12 +117,9 @@ export default function UploadPage() {
       }
       
       const modifiedBytes = await pdfDoc.save();
-      
-      const modifiedFile = new File(
-        [modifiedBytes], 
-        file.name, 
-        { type: file.type }
-      );
+      const fileBytes = new Uint8Array(modifiedBytes);
+
+      const modifiedFile = new File([fileBytes], file.name, { type: file.type });
       
       setAnalysisFile(modifiedFile);
     };

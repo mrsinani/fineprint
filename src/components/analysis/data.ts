@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import type {
   ActionCategory,
   ActionItem,
@@ -212,7 +211,7 @@ function formatDate(value?: string | null) {
   });
 }
 
-function buildSampleDocument(id: string): DocumentAnalysisPageData {
+export function buildSampleDocument(id: string): DocumentAnalysisPageData {
   return {
     id,
     title: "Master Services Agreement",
@@ -490,7 +489,7 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult |
   };
 }
 
-function normalizeDocumentRecord(
+export function normalizeDocumentRecord(
   id: string,
   raw: Record<string, unknown>,
   source: DocumentAnalysisPageData["source"],
@@ -643,54 +642,4 @@ export function getLocalDocumentAnalysisById(
   }
 
   return null;
-}
-
-async function getSupabaseDocumentAnalysisById(
-  id: string,
-): Promise<DocumentAnalysisPageData | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("documents")
-      .select("id, title, file_name, file_type, page_count, created_at, updated_at, analysis:analysis_results(*)")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error || !data || typeof data !== "object") {
-      return null;
-    }
-
-    const normalized = normalizeDocumentRecord(
-      id,
-      data as Record<string, unknown>,
-      "supabase",
-    );
-    if (!normalized) return null;
-
-    if (!normalized.analysis.pdf_url && normalized.analysis.storage_path) {
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("documents").getPublicUrl(normalized.analysis.storage_path);
-
-      normalized.analysis.pdf_url = publicUrl || null;
-    }
-
-    return normalized;
-  } catch {
-    return null;
-  }
-}
-
-export async function getDocumentAnalysisById(
-  id: string,
-): Promise<DocumentAnalysisPageData> {
-  const supabaseDocument = await getSupabaseDocumentAnalysisById(id);
-  if (supabaseDocument) return supabaseDocument;
-
-  return buildSampleDocument(id);
 }

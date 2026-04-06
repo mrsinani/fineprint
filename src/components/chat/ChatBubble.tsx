@@ -60,11 +60,12 @@ export function ChatBubble({ documentId }: { documentId: string }) {
 
       const payload = (await response.json()) as { error?: string; reply?: string };
 
-      if (!response.ok || !payload.reply) {
+      if (!response.ok || payload.reply == null || payload.reply === "") {
         throw new Error(payload.error ?? "Unable to get a response right now.");
       }
 
-      setMessages((current) => [...current, createMessage("assistant", payload.reply)]);
+      const reply = payload.reply;
+      setMessages((current) => [...current, createMessage("assistant", reply)]);
     } catch (error) {
       const fallback =
         error instanceof Error
