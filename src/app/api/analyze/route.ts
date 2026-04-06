@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { anonymizeDocument } from "@/app/utils/anonymize";
 import { deanonymizeText } from "@/app/utils/anonymize";
 import { TAXONOMY } from "@/lib/taxonomy";
@@ -7,6 +6,7 @@ import { computeClauseSeverity, computeDocumentScore } from "@/lib/scoring";
 import { extractText } from "@/lib/extractText";
 import { extractTextFromBuffer } from "@/lib/extractText";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthenticatedUser } from "@/lib/auth";
 import type { UserSensitivityPreferences } from "@/lib/sensitivity";
 
 // --- OpenAI Fetch Helper ---
@@ -64,6 +64,11 @@ async function askOpenAI(
 }
 
 export async function POST(req: NextRequest) {
+  const { userId } = await getAuthenticatedUser(req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let documentType = "";
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -258,8 +263,7 @@ Rules:
 
     // Fetch user sensitivity preferences for personalized scoring
     let sensitivityPrefs: UserSensitivityPreferences | undefined;
-    const { userId } = await auth();
-    if (userId) {
+    {
       const supabase = createAdminClient();
       const { data: userData } = await supabase
         .from("users")

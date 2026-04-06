@@ -1,11 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractTextFromBuffer } from "@/lib/extractText";
 import { ensureUserExists } from "@/lib/ensureUserExists";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuthenticatedUser(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
