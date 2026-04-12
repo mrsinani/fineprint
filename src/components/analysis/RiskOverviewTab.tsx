@@ -78,7 +78,7 @@ export function RiskOverviewTab({ analysis }: { analysis: AnalysisResult }) {
                 <div>
                   <h3 className="text-lg font-semibold text-navy-100">{clause.title}</h3>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-navy-300">
-                    {clause.description}
+                    {clause.quote}
                   </p>
                 </div>
                 <span
