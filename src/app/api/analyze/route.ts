@@ -81,11 +81,18 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
     let rawDocumentText: string;
+    let inputAlreadyAnonymized = false;
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
+      const reviewedText =
+        typeof body.reviewedText === "string" ? body.reviewedText : "";
 
-      if (body.storagePath) {
+      if (reviewedText.trim().length > 0) {
+        documentType = body.documentType ?? "";
+        rawDocumentText = reviewedText;
+        inputAlreadyAnonymized = body.reviewedTextIsAnonymized === true;
+      } else if (body.storagePath) {
         // File already in Supabase Storage -- download and extract text
         documentType = body.documentType ?? "";
         const supabase = createAdminClient();
@@ -132,7 +139,9 @@ export async function POST(req: NextRequest) {
     }
 
     // --- 1. SCRUB THE DATA ---
-    const { scrubbedText, vault } = anonymizeDocument(rawDocumentText);
+    const { scrubbedText, vault } = inputAlreadyAnonymized
+      ? { scrubbedText: rawDocumentText, vault: {} as Record<string, string> }
+      : anonymizeDocument(rawDocumentText);
 
     // --- 2. GATEKEEPER CHECK (Using Scrubbed Text) ---
     const typeHint = documentType ? ` The user labeled it as "${documentType}" but accept` : " Accept";
@@ -288,9 +297,10 @@ Rules:
     );
 
     // --- 6. DE-ANONYMIZE AND RETURN ---
-    const jsonString = JSON.stringify(rawResult);
-    const restoredJsonString = deanonymizeText(jsonString, vault);
-    const finalData = JSON.parse(restoredJsonString);
+    const finalData =
+      inputAlreadyAnonymized
+        ? rawResult
+        : JSON.parse(deanonymizeText(JSON.stringify(rawResult), vault));
 
     return NextResponse.json(finalData);
 
