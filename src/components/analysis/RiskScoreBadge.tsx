@@ -3,27 +3,22 @@
 function getScoreStyles(score: number) {
   if (score >= 76) {
     return {
-      ring: "ring-red-200",
-      bg: "bg-red-50",
-      text: "text-red-600",
-      label: "High risk",
+      text:     "text-red-500",
+      label:    "High Risk",
+      subtitle: "High risk level — negotiate before signing",
     };
   }
-
   if (score >= 51) {
     return {
-      ring: "ring-amber-200",
-      bg: "bg-amber-50",
-      text: "text-amber-600",
-      label: "Medium risk",
+      text:     "text-amber-500",
+      label:    "Medium Risk",
+      subtitle: "Above average risk level",
     };
   }
-
   return {
-    ring: "ring-emerald-200",
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    label: "Low risk",
+    text:     "text-emerald-500",
+    label:    "Low Risk",
+    subtitle: "Below average risk level",
   };
 }
 
@@ -31,19 +26,15 @@ export function RiskScoreBadge({ score }: { score: number }) {
   const styles = getScoreStyles(score);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-[28px] border border-navy-700 bg-white p-6 shadow-sm">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-navy-400">
-        Risk score
-      </span>
-      <div
-        className={`flex h-32 w-32 items-center justify-center rounded-full ring-8 ${styles.ring} ${styles.bg}`}
-      >
-        <span className={`text-4xl font-bold ${styles.text}`}>{score}</span>
-      </div>
-      <span className={`text-sm font-semibold ${styles.text}`}>{styles.label}</span>
-      <p className="max-w-44 text-center text-xs leading-5 text-navy-500">
-        Scores above 75 usually deserve negotiation before signing.
+    <div className="flex flex-col justify-center gap-3 rounded-[28px] border border-navy-700 bg-white p-8 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-navy-500">
+        Overall Risk Score
       </p>
+      <p className={`font-display text-8xl font-bold leading-none tabular-nums ${styles.text}`}>
+        {score}
+      </p>
+      <p className={`text-lg font-semibold ${styles.text}`}>{styles.label}</p>
+      <p className="max-w-[180px] text-sm leading-relaxed text-navy-500">{styles.subtitle}</p>
     </div>
   );
 }
