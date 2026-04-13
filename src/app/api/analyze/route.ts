@@ -182,7 +182,7 @@ Return a single JSON object with EXACTLY this shape (no extra keys):
       "char_start": 0,
       "char_end": 0,
       "triggered_features": [],
-      "explanation": "This clause [what it does]. This is [why it is risky for the user]. The key concern is [specific detail from the quote].",
+      "explanation": "Plain-language interpretation ONLY: what the clause does and why it matters for the reader. Do not copy or paste contract wording. Do not paraphrase the quote line-by-line. If you cannot add insight beyond the quote, write one short sentence on the practical risk instead.",
       "recommendation": "One actionable sentence telling the user what to do or watch out for.",
       "section": "Section heading or number where this clause appears",
       "confidence": "HIGH"
@@ -201,6 +201,7 @@ Return a single JSON object with EXACTLY this shape (no extra keys):
 
 Rules:
 - Return the top 15 most important risky clauses, prioritising highest-severity ones.
+- "explanation" and "quote" must differ: the explanation is your analysis; the quote is exact contract text only. Never use the same sentences in both fields.
 - Each clause "quote" MUST be verbatim — do NOT paraphrase, fix typos, or alter capitalisation.
 - "char_start" and "char_end" are integer character offsets of the quote within the document text.
 - "section" is the heading or section number nearest to the clause.

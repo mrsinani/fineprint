@@ -129,14 +129,16 @@ export function RiskHeatmapView({ analysis }: { analysis: AnalysisResult }) {
           </div>
 
           <div className="mt-5 space-y-4">
-            <div className="rounded-2xl bg-navy-900 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-500">
-                Description
-              </p>
-              <p className="mt-2 text-sm leading-6 text-navy-300">
-                {selectedClause.description}
-              </p>
-            </div>
+            {selectedClause.description.trim().length > 0 ? (
+              <div className="rounded-2xl bg-navy-900 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-500">
+                  Description
+                </p>
+                <p className="mt-2 text-sm leading-6 text-navy-300">
+                  {selectedClause.description}
+                </p>
+              </div>
+            ) : null}
 
             <div className="rounded-2xl bg-gold-100/40 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-700">
