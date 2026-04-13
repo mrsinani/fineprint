@@ -65,7 +65,12 @@ export function RiskOverviewTab({ analysis }: { analysis: AnalysisResult }) {
               className="rounded-[24px] border border-navy-700 bg-white p-5 shadow-sm"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <h3 className="text-lg font-semibold text-navy-100">{clause.title}</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-navy-100">{clause.title}</h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-navy-300">
+                    {clause.quote}
+                  </p>
+                </div>
                 <span
                   className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ring-1 ring-inset ${SEVERITY_BADGES[clause.severity]}`}
                 >

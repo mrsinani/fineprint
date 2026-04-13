@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { PendingFileRow } from "@/components/upload/PendingFileRow";
 import { DocumentTypeSelector } from "@/components/documents/DocumentTypeSelector";
+import { Info, Shield } from "lucide-react";
 
 const DocumentPreview = dynamic(
   () =>
@@ -17,6 +18,7 @@ const DocumentPreview = dynamic(
 type UploadStatus = "pending" | "uploading" | "done" | "error";
 type InputMode = "file" | "text";
 type ApiError = { error?: string };
+type UploadedDocument = { storagePath: string; docId: string };
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -74,6 +76,7 @@ export default function UploadPage() {
   const [analysisFile, setAnalysisFile] = useState<File | null>(null);
   const [fileStatus, setFileStatus] = useState<UploadStatus>("pending");
   const [previewUrl] = useState<string | null>(null);
+  const [uploadedDocument, setUploadedDocument] = useState<UploadedDocument | null>(null);
 
   // Tracking PDF Pages
   const [excludedPages, setExcludedPages] = useState<number[]>([]);
@@ -81,6 +84,10 @@ export default function UploadPage() {
 
   // Text state
   const [pastedText, setPastedText] = useState("");
+  const [reviewText, setReviewText] = useState("");
+  const [extractedText, setExtractedText] = useState("");
+  const [hasLoadedReview, setHasLoadedReview] = useState(false);
+  const [isPreparingReview, setIsPreparingReview] = useState(false);
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -127,15 +134,30 @@ export default function UploadPage() {
     modifyPdf();
   }, [excludedPages, file]);
 
+  useEffect(() => {
+    setUploadedDocument(null);
+    setReviewText("");
+    setExtractedText("");
+    setHasLoadedReview(false);
+  }, [analysisFile]);
+
   const handleFileSelect = useCallback((selected: File) => {
     setFile(selected);
     setAnalysisFile(selected);
     setFileStatus("pending");
+    setUploadedDocument(null);
+    setReviewText("");
+    setExtractedText("");
+    setHasLoadedReview(false);
   }, []);
 
   const handleRemoveFile = useCallback(() => {
     setFile(null);
     setFileStatus("pending");
+    setUploadedDocument(null);
+    setReviewText("");
+    setExtractedText("");
+    setHasLoadedReview(false);
   }, []);
 
   const simulateFileUpload = useCallback(() => {
@@ -149,6 +171,53 @@ export default function UploadPage() {
       ? fileStatus === "done" && !(totalPages > 0 && excludedPages.length === totalPages)
       : pastedText.trim().length > 0;
 
+  const ensureUploadedDocument = useCallback(async () => {
+    if (uploadedDocument) return uploadedDocument;
+    if (!analysisFile) {
+      throw new Error("No file selected.");
+    }
+
+    const nextUploadedDocument = await uploadToStorage(analysisFile);
+    setUploadedDocument(nextUploadedDocument);
+    return nextUploadedDocument;
+  }, [analysisFile, uploadedDocument]);
+
+  const handlePreparePrivacyReview = useCallback(async () => {
+    if (!analysisFile) return;
+
+    setIsPreparingReview(true);
+    setStatusMessage("Preparing review...");
+
+    try {
+      const { storagePath } = await ensureUploadedDocument();
+      const extractRes = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePath,
+          fileType: analysisFile.type,
+        }),
+      });
+
+      const extractData = (await extractRes.json()) as { text?: string; error?: string };
+      if (!extractRes.ok) {
+        throw new Error(extractData.error || `Extraction error: ${extractRes.status}`);
+      }
+
+      const nextText = typeof extractData.text === "string" ? extractData.text : "";
+      setExtractedText(nextText);
+      setReviewText(nextText);
+      setHasLoadedReview(true);
+      setFileStatus("done");
+    } catch (error) {
+      console.error("Privacy review preparation failed:", error);
+      alert(error instanceof Error ? error.message : "Failed to prepare privacy review.");
+    } finally {
+      setIsPreparingReview(false);
+      setStatusMessage("");
+    }
+  }, [analysisFile, ensureUploadedDocument]);
+
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setStatusMessage("");
@@ -156,10 +225,11 @@ export default function UploadPage() {
     try {
       if (mode === "file") {
         if (!analysisFile) return;
+        const approvedReviewText = reviewText.trim();
 
         // 1. Upload file directly to Supabase Storage (bypasses Vercel size limit)
         setStatusMessage("Uploading...");
-        const { storagePath, docId } = await uploadToStorage(analysisFile);
+        const { storagePath, docId } = await ensureUploadedDocument();
 
         // 2. Analyze via storage path (small JSON payload to Vercel)
         setStatusMessage("Analyzing...");
@@ -170,6 +240,8 @@ export default function UploadPage() {
             storagePath,
             documentType,
             fileType: analysisFile.type,
+            reviewedText: approvedReviewText || undefined,
+            reviewedTextIsAnonymized: approvedReviewText.length > 0,
           }),
         });
 
@@ -198,6 +270,7 @@ export default function UploadPage() {
             documentType,
             pageCount: totalPages,
             title: analysisFile.name.replace(/\.[^/.]+$/, ""),
+            rawText: approvedReviewText || undefined,
           }),
         });
 
@@ -251,6 +324,9 @@ export default function UploadPage() {
         </h1>
         <p className="mt-2 text-[15px] text-navy-400">
           Upload a file or paste contract text to start your analysis.
+        </p>
+        <p className="mt-3 max-w-2xl text-sm text-navy-500">
+          Before analysis, you can optionally review and edit the anonymized text that will be sent to OpenAI for an extra privacy check.
         </p>
       </div>
       <div
@@ -309,11 +385,10 @@ export default function UploadPage() {
                       onClick={simulateFileUpload}
                       className="mt-4 rounded-lg bg-gold-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-gold-700"
                     >
-                      Upload &amp; analyze
+                      Continue
                     </button>
                   )}
                 </div>
-
                 <div>
                   <DocumentPreview
                     fileName={file.name}
@@ -325,11 +400,74 @@ export default function UploadPage() {
                     onNumPagesChange={setTotalPages}
                   />
                 </div>
+
+                <div className="rounded-2xl border border-navy-700 bg-navy-900/80 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-full bg-navy-800 p-2 text-gold-400">
+                      <Shield size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-sm font-semibold text-navy-100">
+                        Privacy review
+                      </h2>
+                      <p className="mt-1 text-sm leading-6 text-navy-400">
+                        For extra control, you can review the anonymized text and remove anything else you do not want included before AI analysis. If you edit it here, this approved version becomes the one sent to OpenAI.
+                      </p>
+                    </div>
+                  </div>
+
+                  {!hasLoadedReview ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handlePreparePrivacyReview}
+                        disabled={isPreparingReview || fileStatus !== "done"}
+                        className="rounded-lg border border-gold-500/40 bg-gold-500/10 px-4 py-2.5 text-sm font-semibold text-gold-300 transition-colors hover:bg-gold-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isPreparingReview ? "Preparing review..." : "Load anonymized text"}
+                      </button>
+                      <p className="text-xs text-navy-500">
+                        Optional, but recommended when you want to manually confirm the anonymization removed everything sensitive enough.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <textarea
+                        value={reviewText}
+                        onChange={(e) => setReviewText(e.target.value)}
+                        rows={16}
+                        className="w-full resize-y rounded-xl border border-navy-700 bg-navy-950 px-5 py-4 text-sm text-navy-100 placeholder:text-navy-500 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+                        placeholder="Review and edit the anonymized text before analysis..."
+                      />
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <p className="flex items-center gap-2 text-xs text-navy-500">
+                          <Info size={14} />
+                          The anonymized text above is what will be sent for AI analysis.
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setReviewText(extractedText)}
+                            className="text-xs font-semibold text-navy-400 transition-colors hover:text-navy-200"
+                          >
+                            Reset to anonymized text
+                          </button>
+                          <span className="text-xs text-navy-500">
+                            {reviewText.length.toLocaleString()} characters
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </>
         ) : (
           <div>
+            <div className="mb-3 rounded-xl border border-navy-700 bg-navy-900/80 p-4 text-sm text-navy-400">
+              The text below is the content that will be analyzed. You can edit or redact it before submission, and we still anonymize it server-side before sending it to OpenAI.
+            </div>
             <textarea
               value={pastedText}
               onChange={(e) => {
@@ -351,7 +489,7 @@ export default function UploadPage() {
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || isPreparingReview}
             className="flex items-center gap-2 rounded-full bg-gold-600 px-8 py-4 text-base font-semibold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-gold-700 hover:shadow-2xl disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {isAnalyzing ? (
