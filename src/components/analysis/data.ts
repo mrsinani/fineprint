@@ -39,6 +39,23 @@ function findOffsets(text: string, quote: string) {
   };
 }
 
+/** Collapse whitespace for comparing model output to verbatim quotes. */
+function normalizeForDedup(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** True when the model echoed the contract text instead of a separate interpretation. */
+function explanationDuplicatesQuote(explanation: string, quote: string): boolean {
+  const e = normalizeForDedup(explanation);
+  const q = normalizeForDedup(quote);
+  if (!e || !q) return false;
+  if (e === q) return true;
+  if (e.length >= 48 && q.length >= 48 && (q.includes(e) || e.includes(q))) {
+    return true;
+  }
+  return false;
+}
+
 function buildClause(
   id: string,
   title: string,
@@ -266,12 +283,19 @@ function deriveActionItems(clauses: RiskClause[]): ActionItem[] {
 }
 
 function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult | null {
+  const summaryObj =
+    raw.summary && typeof raw.summary === "object" && !Array.isArray(raw.summary)
+      ? (raw.summary as Record<string, unknown>)
+      : null;
+
   const overview =
     typeof raw.overview === "string"
       ? raw.overview
       : typeof raw.summary === "string"
         ? raw.summary
-        : null;
+        : summaryObj && typeof summaryObj.overview === "string"
+          ? summaryObj.overview
+          : null;
 
   if (!overview) return null;
 
@@ -282,7 +306,11 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult |
         ? raw.text
         : SAMPLE_DOCUMENT_TEXT;
 
-  const rawParties = Array.isArray(raw.parties) ? raw.parties : [];
+  const rawParties = Array.isArray(raw.parties)
+    ? raw.parties
+    : summaryObj && Array.isArray(summaryObj.parties)
+      ? summaryObj.parties
+      : [];
   const parties: DocumentParty[] =
     rawParties.length > 0
       ? rawParties.flatMap((party, index) => {
@@ -389,11 +417,28 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult |
                 : findOffsets(documentText, quote).char_end,
           };
 
+          const rawExplanation =
+            typeof clause.explanation === "string" ? clause.explanation.trim() : "";
+          const legacyDescription =
+            typeof clause.description === "string" ? clause.description.trim() : "";
+
+          let description = rawExplanation || legacyDescription;
+          if (description && explanationDuplicatesQuote(description, quote)) {
+            description = "";
+          }
+
+          const sectionTitle =
+            typeof clause.section === "string" ? clause.section.trim() : "";
+
           return [
             {
               id: typeof clause.id === "string" ? clause.id : `clause-${index}`,
               title:
-                typeof clause.title === "string" ? clause.title : `Risk ${index + 1}`,
+                typeof clause.title === "string" && clause.title.trim().length > 0
+                  ? clause.title.trim()
+                  : sectionTitle.length > 0
+                    ? sectionTitle
+                    : `Risk ${index + 1}`,
               severity:
                 clause.severity === "HIGH" ||
                 clause.severity === "MEDIUM" ||
@@ -402,10 +447,7 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult |
                   : severityFromLevel(
                       typeof clause.severity === "number" ? clause.severity : 1,
                     ),
-              description:
-                typeof clause.description === "string"
-                  ? clause.description
-                  : quote,
+              description,
               recommendation:
                 typeof clause.recommendation === "string"
                   ? clause.recommendation
@@ -422,9 +464,11 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult |
 
   const rawPlainEnglish = Array.isArray(raw.plain_english)
     ? raw.plain_english
-    : Array.isArray(raw.obligations)
-      ? raw.obligations
-      : [];
+    : summaryObj && Array.isArray(summaryObj.plain_english)
+      ? summaryObj.plain_english
+      : Array.isArray(raw.obligations)
+        ? raw.obligations
+        : [];
 
   const plain_english = rawPlainEnglish.filter(
     (entry): entry is string => typeof entry === "string",

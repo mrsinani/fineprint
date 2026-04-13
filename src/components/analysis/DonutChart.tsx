@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { RiskSeverity } from "@/components/analysis/types";
 
 interface DonutChartProps {
@@ -7,109 +8,115 @@ interface DonutChartProps {
 }
 
 const SEVERITY_STYLES: Record<RiskSeverity, { color: string; label: string }> = {
-  HIGH: { color: "#dc2626", label: "High risk" },
-  MEDIUM: { color: "#d97706", label: "Medium risk" },
-  LOW: { color: "#059669", label: "Low risk" },
+  HIGH:   { color: "#c54332", label: "High Risk" },
+  MEDIUM: { color: "#cb8231", label: "Medium Risk" },
+  LOW:    { color: "#46956f", label: "Low Risk" },
 };
 
-function polarToCartesian(
-  centerX: number,
-  centerY: number,
-  radius: number,
-  angleInDegrees: number,
-) {
-  const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180;
-
-  return {
-    x: centerX + radius * Math.cos(angleInRadians),
-    y: centerY + radius * Math.sin(angleInRadians),
-  };
+function polarToXY(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-function describeArc(
-  x: number,
-  y: number,
-  radius: number,
-  startAngle: number,
-  endAngle: number,
-) {
-  const start = polarToCartesian(x, y, radius, endAngle);
-  const end = polarToCartesian(x, y, radius, startAngle);
-  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-
-  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+function slicePath(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
+  const start = polarToXY(cx, cy, r, startAngle);
+  const end   = polarToXY(cx, cy, r, endAngle);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
 }
 
 export function DonutChart({ counts }: DonutChartProps) {
+  const [hovered, setHovered] = useState<RiskSeverity | null>(null);
   const total = counts.HIGH + counts.MEDIUM + counts.LOW;
-  const radius = 52;
 
   if (total === 0) {
     return (
-      <div className="flex h-[180px] w-[180px] items-center justify-center rounded-full border border-dashed border-navy-700 text-sm text-navy-500">
+      <div className="flex h-[220px] w-[220px] items-center justify-center rounded-full border-2 border-dashed border-navy-700 text-sm text-navy-500">
         No risks
       </div>
     );
   }
 
+  // Expanded viewBox: outside labels + long strings ("Medium Risk: …") must stay inside drawable area.
+  const viewBox = "-180 -45 840 470";
+  const cx = 240;
+  const cy = 190;
+  const r = 130;
+
   let currentAngle = 0;
+  const slices = (["HIGH", "MEDIUM", "LOW"] as const)
+    .filter((s) => counts[s] > 0)
+    .map((severity) => {
+      const count      = counts[severity];
+      const sliceAngle = (count / total) * 360;
+      const startAngle = currentAngle;
+      const endAngle   = currentAngle + sliceAngle;
+      const midAngle   = currentAngle + sliceAngle / 2;
+      currentAngle    += sliceAngle;
+      return { severity, count, startAngle, endAngle, midAngle, pct: Math.round((count / total) * 100) };
+    });
 
   return (
-    <div className="flex items-center gap-6">
-      <div className="relative h-[180px] w-[180px]">
-        <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
-          <circle
-            cx="70"
-            cy="70"
-            r={radius}
-            fill="none"
-            stroke="#d5d9e2"
-            strokeWidth="16"
-          />
-          {(["HIGH", "MEDIUM", "LOW"] as const).map((severity) => {
-            const count = counts[severity];
-            if (count === 0) return null;
+    <div className="relative flex w-full max-w-xl flex-col items-center overflow-visible">
+      <svg viewBox={viewBox} className="h-auto w-full overflow-visible" role="img">
+        <title>Risk Distribution</title>
 
-            const sliceAngle = (count / total) * 360;
-            const path = describeArc(70, 70, radius, currentAngle, currentAngle + sliceAngle);
-            currentAngle += sliceAngle;
+        {slices.map(({ severity, startAngle, endAngle, midAngle, pct }) => {
+          const style    = SEVERITY_STYLES[severity];
+          const isHover  = hovered === severity;
+          const labelPt  = polarToXY(cx, cy, r * 1.38, midAngle);
+          const linePt1  = polarToXY(cx, cy, r + 8, midAngle);
+          const linePt2  = polarToXY(cx, cy, r * 1.24, midAngle);
+          const textAnchor =
+            labelPt.x > cx + 8 ? "start" : labelPt.x < cx - 8 ? "end" : "middle";
 
-            return (
+          return (
+            <g key={severity}>
               <path
-                key={severity}
-                d={path}
-                fill="none"
-                stroke={SEVERITY_STYLES[severity].color}
-                strokeWidth="16"
-                strokeLinecap="round"
-                aria-label={`${SEVERITY_STYLES[severity].label}: ${count}`}
+                d={slicePath(cx, cy, r, startAngle, endAngle)}
+                fill={style.color}
+                opacity={hovered && !isHover ? 0.45 : 1}
+                stroke="white"
+                strokeWidth="1.5"
+                onMouseEnter={() => setHovered(severity)}
+                onMouseLeave={() => setHovered(null)}
+                className="cursor-pointer"
+                style={{ transition: "opacity 0.18s ease" }}
               />
-            );
-          })}
-        </svg>
+              <line
+                x1={linePt1.x}
+                y1={linePt1.y}
+                x2={linePt2.x}
+                y2={linePt2.y}
+                stroke={style.color}
+                strokeWidth="1"
+                opacity="0.6"
+              />
+              <text
+                x={labelPt.x}
+                y={labelPt.y}
+                textAnchor={textAnchor}
+                dominantBaseline="middle"
+                fill={style.color}
+                fontSize="18"
+                fontWeight="600"
+                className="pointer-events-none select-none [text-rendering:geometricPrecision]"
+              >
+                {style.label}: {pct}%
+              </text>
+            </g>
+          );
+        })}
+      </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-400">
-            Clauses
-          </span>
-          <span className="mt-1 text-4xl font-bold text-navy-100">{total}</span>
-          <span className="mt-1 text-xs text-navy-500">Flagged sections</span>
+      {hovered && (
+        <div
+          className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1 rounded-xl border border-navy-700 bg-white px-3 py-1.5 text-xs font-semibold shadow-md"
+          style={{ color: SEVERITY_STYLES[hovered].color }}
+        >
+          {SEVERITY_STYLES[hovered].label}: {counts[hovered]}
         </div>
-      </div>
-
-      <div className="space-y-3">
-        {(["HIGH", "MEDIUM", "LOW"] as const).map((severity) => (
-          <div key={severity} className="flex items-center gap-3 text-sm text-navy-300">
-            <span
-              className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: SEVERITY_STYLES[severity].color }}
-              aria-hidden
-            />
-            <span className="min-w-24">{SEVERITY_STYLES[severity].label}</span>
-            <span className="font-semibold text-navy-100">{counts[severity]}</span>
-          </div>
-        ))}
-      </div>
+      )}
     </div>
   );
 }

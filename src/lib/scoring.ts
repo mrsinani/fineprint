@@ -29,8 +29,17 @@ export function computeClauseSeverity(clause: {
   const triggered_features: string[] = [];
   const q = clause.quote.toLowerCase();
 
-  // +1: "without notice" or "at any time" — always
-  if (q.includes("without notice") || q.includes("at any time")) {
+  // +1: "without notice" or "at any time" — only for categories where unilateral timing actually matters
+  const unilateralCategories = new Set([
+    "termination_rights",
+    "price_changes_fee_escalation",
+    "content_moderation_suspension",
+    "auto_renewal_cancellation",
+  ]);
+  if (
+    (q.includes("without notice") || q.includes("at any time")) &&
+    clause.category.some((c) => unilateralCategories.has(c))
+  ) {
     tier += 1;
     triggered_features.push("unilateral action without notice");
   }
@@ -92,22 +101,27 @@ export function computeClauseSeverity(clause: {
   return { severity: tierToSeverity[tier], triggered_features };
 }
 
-const SEVERITY_POINTS: Record<Severity, number> = { HIGH: 18, MEDIUM: 7, LOW: 2 };
+// Relative weights — only the ratios matter for the normalized formula below
+const SEVERITY_WEIGHTS: Record<Severity, number> = { HIGH: 3, MEDIUM: 1.5, LOW: 0.5 };
 
 export function computeDocumentScore(
   clauses: { severity: Severity; category?: string[] }[],
   sensitivityPrefs?: UserSensitivityPreferences,
 ): number {
-  let score = 0;
+  if (clauses.length === 0) return 0;
 
+  let weightedSum = 0;
   for (const clause of clauses) {
-    const base = SEVERITY_POINTS[clause.severity];
+    const weight = SEVERITY_WEIGHTS[clause.severity];
     const multiplier =
       sensitivityPrefs && clause.category?.length
         ? getSensitivityMultiplier(clause.category, sensitivityPrefs)
         : 1.0;
-    score += base * multiplier;
+    weightedSum += weight * multiplier;
   }
 
-  return Math.min(Math.round(score), 100);
+  // Normalize against "all clauses are HIGH" so the score reflects proportion of
+  // severity rather than raw count — prevents long documents from always hitting 100.
+  const maxPossible = clauses.length * SEVERITY_WEIGHTS.HIGH;
+  return Math.min(Math.round((weightedSum / maxPossible) * 100), 100);
 }
