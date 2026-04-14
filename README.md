@@ -1,38 +1,84 @@
 # FinePrint
 
-Next.js frontend with Supabase backend (auth, database, edge functions).
+FinePrint is an AI-assisted contract review app for small business owners. Users can upload legal documents or paste text, optionally review an anonymized version before analysis, and receive structured risk summaries, clause-level explanations, and action items.
+
+The repository contains the Next.js web app, Supabase-backed persistence, and supporting browser-extension code.
 
 ## Tech Stack
 
-- **Frontend:** Next.js 15 (App Router), TypeScript, Tailwind CSS
-- **Backend:** Supabase (Postgres, Auth, Edge Functions)
-- **Package Manager:** npm
+- Frontend: Next.js App Router, React, TypeScript, Tailwind CSS
+- Backend: Next.js Route Handlers, Supabase Auth, Postgres, Storage
+- AI: OpenAI API
+- Auth: Clerk
+- Package manager: npm
+
+## What It Does
+
+- Upload `.pdf`, `.docx`, or `.txt` files for analysis
+- Paste contract text directly into the app
+- Exclude PDF pages before analysis
+- Review anonymized text before it is sent to OpenAI
+- Save document analyses to Supabase
+- Reopen prior analyses from the dashboard
+- Follow up with questions through a chatbot
 
 ## Project Structure
 
-```
-├── src/
-│   ├── app/              # Next.js App Router pages & layouts
-│   ├── lib/supabase/     # Supabase client helpers
-│   │   ├── client.ts     # Browser client (Client Components)
-│   │   ├── server.ts     # Server client (Server Components / Route Handlers)
-│   │   └── middleware.ts  # Session refresh middleware
-│   └── middleware.ts      # Next.js middleware (auth session)
-├── supabase/
-│   ├── config.toml       # Supabase local dev config
-│   ├── functions/        # Supabase Edge Functions (Deno)
-│   │   └── hello/        # Example function
-│   └── migrations/       # SQL migrations
-│       └── *_init.sql    # Profiles table + RLS + trigger
+```text
+src/
+  app/                  Next.js routes, pages, and API handlers
+  components/           UI and analysis components
+  lib/                  Shared clients, helpers, extractors, scoring, taxonomy
+  app/utils/            Document anonymization and related utilities
+supabase/
+  migrations/           Database schema and migration files
+extension/
+  ...                   Browser extension code
 ```
 
-## Getting Started
-
-### Prerequisites
+## Prerequisites
 
 - Node.js 20+
+- npm
+- A Supabase project
+- A Clerk application
+- An OpenAI API key
+
+Optional for local Supabase development:
+
 - [Supabase CLI](https://supabase.com/docs/guides/cli/getting-started)
-- Docker (for local Supabase)
+
+## Environment Variables
+
+There is currently no checked-in `.env.local.example` file, so create `.env.local` manually in the project root.
+
+Required for the web app:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=
+NEXT_PUBLIC_EXTENSION_ID=
+```
+
+You may also need the standard Clerk public variables depending on your local auth setup:
+
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+```
+
+Notes:
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are required by the app server and Supabase helpers.
+- `OPENAI_API_KEY` is required for document analysis and chat.
+- `CLERK_SECRET_KEY` is required for authenticated server routes.
+- `CLERK_WEBHOOK_SECRET` is required if you are testing Clerk webhooks locally.
+- `NEXT_PUBLIC_EXTENSION_ID` is only needed for extension auth flows.
+
+## Getting Started
 
 ### 1. Install dependencies
 
@@ -40,69 +86,91 @@ Next.js frontend with Supabase backend (auth, database, edge functions).
 npm install
 ```
 
-### 2. Set up environment variables
+### 2. Create `.env.local`
 
-```bash
-cp .env.local.example .env.local
-```
+Create a `.env.local` file in the repo root and fill in the environment variables listed above.
 
-Fill in your Supabase project URL and anon key (from the [Supabase dashboard](https://supabase.com/dashboard)), or use the local dev values below.
-
-### 3. Start local Supabase
-
-```bash
-npx supabase start
-```
-
-This starts a local Supabase stack (Postgres, Auth, Storage, etc.) via Docker. Copy the `API URL` and `anon key` from the output into `.env.local`.
-
-### 4. Run the dev server
+### 3. Run the app
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+The app runs on [http://localhost:3001](http://localhost:3001).
 
-### Edge Functions
+## Running With Hosted Supabase
 
-Serve locally:
+If you are using a hosted Supabase project instead of local containers:
 
-```bash
-npx supabase functions serve
-```
+1. Create a Supabase project.
+2. Add the project URL, anon key, and service role key to `.env.local`.
+3. Apply the SQL in `supabase/migrations/` to your project.
+4. Start the Next.js app with `npm run dev`.
 
-Invoke the example function:
+## Running With Local Supabase
 
-```bash
-curl -i --request POST http://127.0.0.1:54321/functions/v1/hello \
-  --header 'Authorization: Bearer <anon-key>' \
-  --header 'Content-Type: application/json' \
-  --data '{"name":"World"}'
-```
+If you want the full local stack:
 
-### Database Migrations
-
-Create a new migration:
+### 1. Start Supabase
 
 ```bash
-npx supabase migration new <name>
+npx supabase start
 ```
 
-Apply migrations locally:
+### 2. Copy local credentials
+
+Use the `API URL`, `anon key`, and service role key from the CLI output and place them in `.env.local`.
+
+### 3. Apply migrations when needed
 
 ```bash
 npx supabase db reset
 ```
 
-Push migrations to a remote project:
+### 4. Start the app
+
+```bash
+npm run dev
+```
+
+## Useful Commands
+
+Run lint:
+
+```bash
+npm run lint
+```
+
+Create a new Supabase migration:
+
+```bash
+npx supabase migration new <name>
+```
+
+Push migrations to a remote Supabase project:
 
 ```bash
 npx supabase db push
 ```
 
+Serve Supabase Edge Functions locally:
+
+```bash
+npx supabase functions serve
+```
+
+## Known Setup Notes
+
+- The README previously referenced `.env.local.example`, but that file is not in the repository.
+- The Next.js dev server is configured for port `3001`.
+- Running the app usually requires configuring Supabase, Clerk, and OpenAI before the UI is fully functional.
+- Browser-extension flows may require additional extension-specific setup beyond the web app.
+
 ## Deployment
 
-- **Frontend:** Deploy to [Vercel](https://vercel.com) — connect the repo and set the Supabase env vars.
-- **Edge Functions:** `npx supabase functions deploy`
-- **Database:** `npx supabase db push` to apply migrations to your hosted Supabase project.
+- Frontend: Vercel
+- Database and storage: Supabase
+- Auth: Clerk
+- AI: OpenAI API
+
+Before deploying, make sure the same environment variables from local development are configured in your hosting provider.

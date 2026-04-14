@@ -68,7 +68,7 @@ export default function PrivacyPage() {
             <p>
               The browser extension stores your authentication token, basic profile info, your
               auto-detect preference, and the most recent analysis result locally on your device
-              using Chrome's storage API.
+              using the Chrome storage API.
             </p>
           </section>
 
@@ -86,8 +86,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Data Sharing</h2>
             <p>
               We do not sell, rent, or trade your personal information to third parties. Page
-              content submitted for analysis is sent to OpenAI's API to generate results.
-              OpenAI's API data usage policy states that data sent through the API is not used
+              content submitted for analysis is sent to the OpenAI API to generate results.
+              The OpenAI API data usage policy states that data sent through the API is not used
               to train their models. We do not use your data to train any AI models. We may
               use third-party service providers (hosting, authentication, database) that process
               data on our behalf under strict confidentiality obligations.
