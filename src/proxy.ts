@@ -17,6 +17,8 @@ const isAppRoute = createRouteMatcher([
   "/onboarding(.*)",
 ]);
 
+const isApiRoute = createRouteMatcher(["/api(.*)"]);
+
 const isAuthRoute = createRouteMatcher([
   "/login(.*)",
   "/signup(.*)",
@@ -24,6 +26,10 @@ const isAuthRoute = createRouteMatcher([
 ]);
 
 const clerkAuth = clerkMiddleware(async (auth, request) => {
+  if (isApiRoute(request)) {
+    return NextResponse.next();
+  }
+
   const supabaseResponse = await updateSession(request);
 
   const { userId } = await auth();
