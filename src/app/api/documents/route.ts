@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     documentType,
     pageCount,
     title,
+    rawText,
   } = body;
 
   if (!storagePath || !analysisResult || !docId) {
@@ -32,16 +33,20 @@ export async function POST(req: Request) {
 
   // Extract raw text from the file already in storage
   let raw_text: string | null = null;
-  try {
-    const { data: fileData, error: dlError } = await supabase.storage
-      .from("documents")
-      .download(storagePath);
-    if (!dlError && fileData) {
-      const buffer = Buffer.from(await fileData.arrayBuffer());
-      raw_text = await extractTextFromBuffer(buffer, fileType ?? "application/pdf");
+  if (typeof rawText === "string" && rawText.trim().length > 0) {
+    raw_text = rawText;
+  } else {
+    try {
+      const { data: fileData, error: dlError } = await supabase.storage
+        .from("documents")
+        .download(storagePath);
+      if (!dlError && fileData) {
+        const buffer = Buffer.from(await fileData.arrayBuffer());
+        raw_text = await extractTextFromBuffer(buffer, fileType ?? "application/pdf");
+      }
+    } catch {
+      // Non-fatal: raw_text is a nice-to-have
     }
-  } catch {
-    // Non-fatal: raw_text is a nice-to-have
   }
 
   // Insert document row

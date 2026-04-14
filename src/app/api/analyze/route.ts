@@ -81,11 +81,18 @@ export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get("content-type") || "";
     let rawDocumentText: string;
+    let inputAlreadyAnonymized = false;
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
+      const reviewedText =
+        typeof body.reviewedText === "string" ? body.reviewedText : "";
 
-      if (body.storagePath) {
+      if (reviewedText.trim().length > 0) {
+        documentType = body.documentType ?? "";
+        rawDocumentText = reviewedText;
+        inputAlreadyAnonymized = body.reviewedTextIsAnonymized === true;
+      } else if (body.storagePath) {
         // File already in Supabase Storage -- download and extract text
         documentType = body.documentType ?? "";
         const supabase = createAdminClient();
@@ -132,7 +139,9 @@ export async function POST(req: NextRequest) {
     }
 
     // --- 1. SCRUB THE DATA ---
-    const { scrubbedText, vault } = anonymizeDocument(rawDocumentText);
+    const { scrubbedText, vault } = inputAlreadyAnonymized
+      ? { scrubbedText: rawDocumentText, vault: {} as Record<string, string> }
+      : anonymizeDocument(rawDocumentText);
 
     // --- 2. GATEKEEPER CHECK (Using Scrubbed Text) ---
     const typeHint = documentType ? ` The user labeled it as "${documentType}" but accept` : " Accept";
@@ -182,7 +191,7 @@ Return a single JSON object with EXACTLY this shape (no extra keys):
       "char_start": 0,
       "char_end": 0,
       "triggered_features": [],
-      "explanation": "This clause [what it does]. This is [why it is risky for the user]. The key concern is [specific detail from the quote].",
+      "explanation": "Plain-language interpretation ONLY: what the clause does and why it matters for the reader. Do not copy or paste contract wording. Do not paraphrase the quote line-by-line. If you cannot add insight beyond the quote, write one short sentence on the practical risk instead.",
       "recommendation": "One actionable sentence telling the user what to do or watch out for.",
       "section": "Section heading or number where this clause appears",
       "confidence": "HIGH"
@@ -201,6 +210,7 @@ Return a single JSON object with EXACTLY this shape (no extra keys):
 
 Rules:
 - Return the top 15 most important risky clauses, prioritising highest-severity ones.
+- "explanation" and "quote" must differ: the explanation is your analysis; the quote is exact contract text only. Never use the same sentences in both fields.
 - Each clause "quote" MUST be verbatim — do NOT paraphrase, fix typos, or alter capitalisation.
 - "char_start" and "char_end" are integer character offsets of the quote within the document text.
 - "section" is the heading or section number nearest to the clause.
@@ -288,9 +298,10 @@ Rules:
     );
 
     // --- 6. DE-ANONYMIZE AND RETURN ---
-    const jsonString = JSON.stringify(rawResult);
-    const restoredJsonString = deanonymizeText(jsonString, vault);
-    const finalData = JSON.parse(restoredJsonString);
+    const finalData =
+      inputAlreadyAnonymized
+        ? rawResult
+        : JSON.parse(deanonymizeText(JSON.stringify(rawResult), vault));
 
     return NextResponse.json(finalData);
 

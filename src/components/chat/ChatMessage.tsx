@@ -20,8 +20,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
           isUser
-            ? "rounded-br-md bg-teal-500 text-white"
-            : "rounded-bl-md border border-navy-700 bg-navy-850 text-navy-100"
+            ? "rounded-br-md bg-gold-600 text-white"
+            : "rounded-bl-md border border-navy-700 bg-white text-navy-100"
         }`}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
