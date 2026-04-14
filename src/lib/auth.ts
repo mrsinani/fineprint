@@ -6,7 +6,7 @@ interface AuthResult {
 }
 
 /**
- * Authenticate a request via Clerk session (web app) or Bearer token (extension).
+ * Authenticate a request via Clerk session (web app) or Bearer token (extension / iOS).
  * Returns the Clerk user ID or null.
  */
 export async function getAuthenticatedUser(
@@ -24,11 +24,12 @@ export async function getAuthenticatedUser(
   try {
     const payload = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY!,
-      authorizedParties: [
-        "https://fineprint.dev",
-        "http://localhost:3001",
-      ],
     });
+
+    const iss = "iss" in payload ? payload.iss : undefined;
+    if (iss !== "https://pleasing-grackle-28.clerk.accounts.dev") {
+      return { userId: null };
+    }
 
     if ("sub" in payload && typeof payload.sub === "string") {
       return { userId: payload.sub };
