@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ChevronLeft, FileText, ListChecks, ShieldAlert } from "lucide-react";
+import { ChevronLeft, FileText, ListChecks } from "lucide-react";
 import { getLocalDocumentAnalysisById } from "@/components/analysis/data";
 import { ActionItemsTab } from "@/components/analysis/ActionItemsTab";
-import { RiskOverviewTab } from "@/components/analysis/RiskOverviewTab";
 import { SummaryTab } from "@/components/analysis/SummaryTab";
+import { getScoreStyles } from "@/components/analysis/RiskScoreBadge";
 import type { DocumentAnalysisPageData } from "@/components/analysis/types";
 
 const RiskHeatmapView = dynamic(
@@ -15,7 +15,7 @@ const RiskHeatmapView = dynamic(
   { ssr: false, loading: () => <div className="py-12 text-center text-sm text-navy-400">Loading heatmap...</div> },
 );
 
-type MainTab = "summary" | "risk" | "actions";
+type MainTab = "summary" | "actions";
 type RiskView = "overview" | "heatmap";
 
 const MAIN_TABS: Array<{
@@ -23,8 +23,7 @@ const MAIN_TABS: Array<{
   label: string;
   icon: typeof FileText;
 }> = [
-  { id: "summary", label: "Summary", icon: FileText },
-  { id: "risk", label: "Risk Analysis", icon: ShieldAlert },
+  { id: "summary", label: "Overview", icon: FileText },
   { id: "actions", label: "Action Items", icon: ListChecks },
 ];
 
@@ -49,6 +48,7 @@ export function DocumentAnalysisShell({
   }, [initialDocument.id]);
 
   const document = localDocument ?? initialDocument;
+  const scoreStyles = getScoreStyles(document.analysis.risk_score);
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">
@@ -81,12 +81,15 @@ export function DocumentAnalysisShell({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 backdrop-blur-sm">
+          <div className="rounded-2xl border border-white/70 bg-white/85 px-5 py-4 text-right backdrop-blur-sm">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-400">
-              Overall score
+              Overall risk
             </p>
-            <p className="mt-2 text-4xl font-bold text-navy-100">
-              {document.analysis.risk_score}
+            <p className="mt-1 text-sm font-medium text-navy-500">
+              <span className={`text-2xl font-semibold tabular-nums ${scoreStyles.text}`}>
+                {document.analysis.risk_score}
+                <span className="ml-1 text-sm text-navy-400">/ 100</span>
+              </span>
             </p>
           </div>
         </div>
@@ -118,35 +121,9 @@ export function DocumentAnalysisShell({
         })}
       </div>
 
-      {activeTab === "risk" ? (
-        <div
-          className="mt-6 flex gap-2 opacity-0"
-          style={{ animation: "fp-fade-in-up 0.55s ease-out 0.18s forwards" }}
-        >
-          {(["overview", "heatmap"] as const).map((view) => (
-            <button
-              key={view}
-              type="button"
-              onClick={() => setRiskView(view)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                riskView === view
-                  ? "bg-gold-600 text-white"
-                  : "border border-navy-700 bg-white text-navy-300 hover:border-gold-500 hover:text-gold-700"
-              }`}
-            >
-              {view === "overview" ? "Overview view" : "Heatmap view"}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
       <div className="mt-8">
-        {activeTab === "summary" ? <SummaryTab analysis={document.analysis} /> : null}
-        {activeTab === "risk" && riskView === "overview" ? (
-          <RiskOverviewTab analysis={document.analysis} />
-        ) : null}
-        {activeTab === "risk" && riskView === "heatmap" ? (
-          <RiskHeatmapView analysis={document.analysis} />
+        {activeTab === "summary" ? (
+          <SummaryTab analysis={document.analysis} document={document} />
         ) : null}
         {activeTab === "actions" ? <ActionItemsTab analysis={document.analysis} /> : null}
       </div>

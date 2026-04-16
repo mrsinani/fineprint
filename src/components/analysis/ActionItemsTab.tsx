@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckSquare, Coins, FilePenLine, Gavel, Settings2, Stamp } from "lucide-react";
+import { CheckSquare, Circle, Coins, FilePenLine, Gavel, Settings2, Stamp } from "lucide-react";
 import type { ActionCategory, AnalysisResult, RiskSeverity } from "@/components/analysis/types";
 
 const CARD_STYLES: Record<RiskSeverity, string> = {
@@ -26,6 +26,7 @@ const CATEGORY_ICONS: Record<ActionCategory, typeof FilePenLine> = {
 
 export function ActionItemsTab({ analysis }: { analysis: AnalysisResult }) {
   const [filter, setFilter] = useState<RiskSeverity | "ALL">("ALL");
+  const [completed, setCompleted] = useState<Record<string, boolean>>({});
 
   const counts = analysis.action_items.reduce<Record<RiskSeverity, number>>(
     (acc, item) => {
@@ -42,6 +43,8 @@ export function ActionItemsTab({ analysis }: { analysis: AnalysisResult }) {
         : analysis.action_items.filter((item) => item.severity === filter),
     [analysis.action_items, filter],
   );
+
+  const completedCount = filteredItems.filter((item) => completed[item.id]).length;
 
   return (
     <div className="space-y-8">
@@ -76,12 +79,16 @@ export function ActionItemsTab({ analysis }: { analysis: AnalysisResult }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-display text-2xl font-semibold text-navy-100">
-              Action checklist
+              Before you sign
             </h2>
             <p className="mt-1 text-sm text-navy-500">
               {filter === "ALL"
-                ? "Review the full checklist before signing."
+                ? "Review this short checklist to make sure the most important points are covered."
                 : `Filtered to ${filter.toLowerCase()} priority items.`}
+            </p>
+            <p className="mt-1 text-xs text-navy-500">
+              Estimated time: 5–10 minutes ·{" "}
+              {completedCount} of {filteredItems.length} items marked as done
             </p>
           </div>
 
@@ -99,15 +106,29 @@ export function ActionItemsTab({ analysis }: { analysis: AnalysisResult }) {
         <div className="mt-5 space-y-4">
           {filteredItems.map((item) => {
             const Icon = CATEGORY_ICONS[item.category];
+            const isDone = Boolean(completed[item.id]);
 
             return (
               <article
                 key={item.id}
-                className="flex gap-4 rounded-[24px] border border-navy-700 bg-white p-5 shadow-sm"
+                className={`flex gap-4 rounded-[24px] border bg-white p-5 shadow-sm ${
+                  isDone ? "border-emerald-200 bg-emerald-50/40" : "border-navy-700"
+                }`}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-navy-700 bg-navy-900 text-navy-400">
-                  <CheckSquare size={18} strokeWidth={1.8} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCompleted((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                  }
+                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-navy-700 bg-navy-900 text-navy-400"
+                  aria-label={isDone ? "Mark as not completed" : "Mark as completed"}
+                >
+                  {isDone ? (
+                    <CheckSquare size={18} strokeWidth={1.8} className="text-emerald-400" />
+                  ) : (
+                    <Circle size={18} strokeWidth={1.8} />
+                  )}
+                </button>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -136,3 +157,4 @@ export function ActionItemsTab({ analysis }: { analysis: AnalysisResult }) {
     </div>
   );
 }
+
