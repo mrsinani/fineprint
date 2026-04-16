@@ -4,6 +4,35 @@ import { extractTextFromBuffer } from "@/lib/extractText";
 import { ensureUserExists } from "@/lib/ensureUserExists";
 import { getAuthenticatedUser } from "@/lib/auth";
 
+export async function GET(req: Request) {
+  const { userId } = await getAuthenticatedUser(req);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const limit = Math.min(Number(url.searchParams.get("limit")) || 20, 100);
+  const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
+
+  const supabase = createAdminClient();
+
+  const { data: rows, error } = await supabase
+    .from("documents")
+    .select(
+      "id, title, file_name, file_type, page_count, document_type, overall_risk_score, created_at, updated_at",
+    )
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(rows ?? []);
+}
+
 export async function POST(req: Request) {
   const { userId } = await getAuthenticatedUser(req);
   if (!userId) {

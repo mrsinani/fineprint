@@ -1,9 +1,9 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuthenticatedUser(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuthenticatedUser(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -47,7 +47,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuthenticatedUser(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

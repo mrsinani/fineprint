@@ -27,7 +27,8 @@ export async function getAuthenticatedUser(
     });
 
     const iss = "iss" in payload ? payload.iss : undefined;
-    if (iss !== "https://pleasing-grackle-28.clerk.accounts.dev") {
+    const expectedIssuer = process.env.CLERK_ISSUER_URL;
+    if (expectedIssuer && iss !== expectedIssuer) {
       return { userId: null };
     }
 
