@@ -32,5 +32,26 @@ export async function GET(
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
 
-  return NextResponse.json(doc);
+  const { data: analysis } = await supabase
+    .from("analyses")
+    .select("summary, clauses, action_items, overall_risk_score")
+    .eq("document_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const defaultSummary = { overview: "", parties: [], plain_english: [] };
+
+  return NextResponse.json({
+    ...doc,
+    analysis: analysis
+      ? {
+          summary: analysis.summary ?? defaultSummary,
+          clauses: analysis.clauses ?? [],
+          action_items: analysis.action_items ?? [],
+          overall_risk_score:
+            analysis.overall_risk_score ?? doc.overall_risk_score ?? 0,
+        }
+      : null,
+  });
 }
