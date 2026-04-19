@@ -68,6 +68,9 @@ export function ChatPanel({
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto bg-navy-900 px-5 py-5">
+        <div className="rounded-2xl border border-navy-700 bg-navy-950/70 p-4 text-xs leading-relaxed text-navy-400">
+          This chat is informational only and is not legal advice. Consult a lawyer for legal guidance before acting on anything in this document.
+        </div>
         {messages.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-navy-700 bg-navy-850 p-4 text-sm leading-relaxed text-navy-500">
             Ask a follow-up about the clauses, summary, or practical risks in this document.

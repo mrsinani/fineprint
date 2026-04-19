@@ -93,6 +93,9 @@ export function DocumentAnalysisShell({
             <p className="mt-2 text-sm text-navy-500">
               {formatRiskSummaryCounts(clauseCounts)}
             </p>
+            <p className="mt-3 text-xs leading-relaxed text-navy-500">
+              This analysis is informational only and is not legal advice. Consult a lawyer before acting on or signing any contract.
+            </p>
           </div>
         </div>
       </div>
