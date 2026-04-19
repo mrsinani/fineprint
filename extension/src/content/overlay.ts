@@ -68,15 +68,35 @@ const OVERLAY_STYLES = `
   .fp-score-badge {
     flex-shrink: 0;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    font-size: 14px;
-    font-weight: 800;
+    min-width: 170px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    font-weight: 700;
     color: #fff;
     margin-left: 12px;
+  }
+
+  .fp-score-badge .fp-score-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+    margin: 0 0 4px 0;
+  }
+
+  .fp-score-badge .fp-score-value {
+    font-size: 14px;
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .fp-score-badge .fp-score-meta {
+    font-size: 11px;
+    opacity: 0.85;
+    margin-top: 4px;
   }
 
   .fp-score--low { background: #059669; }
@@ -471,8 +491,26 @@ export class ResultsOverlay {
   private render() {
     if (!this.analysisData) return;
     const data = this.analysisData;
-    const score = data.overall_risk_score;
-    const scoreLevel = score >= 7 ? "high" : score >= 4 ? "medium" : "low";
+    const clauseCounts = (data.clauses ?? []).reduce(
+      (acc, clause) => {
+        if (clause.severity === "HIGH") acc.high += 1;
+        else if (clause.severity === "MEDIUM") acc.medium += 1;
+        else acc.low += 1;
+        return acc;
+      },
+      { high: 0, medium: 0, low: 0 },
+    );
+    const totalClauses = clauseCounts.high + clauseCounts.medium + clauseCounts.low;
+    const concerningCount = clauseCounts.high + clauseCounts.medium;
+    const scoreLevel = clauseCounts.high > 0 ? "high" : clauseCounts.medium > 0 ? "medium" : "low";
+    const summaryText =
+      totalClauses === 0
+        ? "No clauses flagged"
+        : `${concerningCount} of ${totalClauses} clauses flagged as concerning`;
+    const breakdownText =
+      totalClauses === 0
+        ? "No risk clauses detected"
+        : `${clauseCounts.high} high, ${clauseCounts.medium} medium, ${clauseCounts.low} low`;
 
     this.panel.innerHTML = "";
 
@@ -488,7 +526,11 @@ export class ResultsOverlay {
         <h2 class="fp-title">${escapeHtml(this.pageTitle)}</h2>
         <div class="fp-subtitle">Terms of Service Analysis</div>
       </div>
-      <div class="fp-score-badge fp-score--${scoreLevel}">${score}</div>
+      <div class="fp-score-badge fp-score--${scoreLevel}">
+        <p class="fp-score-title">Risk summary</p>
+        <p class="fp-score-value">${escapeHtml(summaryText)}</p>
+        <p class="fp-score-meta">${escapeHtml(breakdownText)}</p>
+      </div>
     `;
 
     const closeBtn = document.createElement("button");

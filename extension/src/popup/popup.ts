@@ -44,14 +44,32 @@ async function loadRecent() {
   const result = await chrome.storage.local.get("fp_last_analysis");
   if (result.fp_last_analysis) {
     const { title, url, result: analysis, timestamp } = result.fp_last_analysis;
-    const score = analysis?.overall_risk_score ?? 0;
-    const level = score >= 7 ? "high" : score >= 4 ? "medium" : "low";
+    let recentSummary = "No clauses flagged";
+    let level = "low";
+
+    if (Array.isArray(analysis?.clauses) && analysis.clauses.length > 0) {
+      const counts = analysis.clauses.reduce(
+        (acc, clause) => {
+          if (clause.severity === "HIGH") acc.high += 1;
+          else if (clause.severity === "MEDIUM") acc.medium += 1;
+          else acc.low += 1;
+          return acc;
+        },
+        { high: 0, medium: 0, low: 0 },
+      );
+      level = counts.high > 0 ? "high" : counts.medium > 0 ? "medium" : "low";
+      recentSummary = `${counts.high} high, ${counts.medium} medium, ${counts.low} low`;
+    } else {
+      const score = analysis?.overall_risk_score ?? 0;
+      level = score >= 7 ? "high" : score >= 4 ? "medium" : "low";
+      recentSummary = `Score: ${score}`;
+    }
 
     recentSection.style.display = "block";
     recentList.innerHTML = `
       <a href="${escapeAttr(url)}" target="_blank" class="fp-popup-recent-item">
         <span class="fp-popup-recent-title">${escapeHtml(title)}</span>
-        <span class="fp-popup-recent-score fp-popup-recent-score--${level}">${score}</span>
+        <span class="fp-popup-recent-score fp-popup-recent-score--${level}">${escapeHtml(recentSummary)}</span>
       </a>
     `;
   }

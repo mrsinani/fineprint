@@ -104,7 +104,7 @@ export class FloatingButton {
   private button: HTMLButtonElement;
   private state: ButtonState = "idle";
   private onClick: (() => void) | null = null;
-  private riskScore: number | null = null;
+  private riskSummary: string | null = null;
   private errorMessage: string | null = null;
 
   constructor() {
@@ -134,9 +134,9 @@ export class FloatingButton {
     (this.shadow.host as HTMLElement).style.right = open ? "444px" : "24px";
   }
 
-  setState(state: ButtonState, riskScore?: number, errorMessage?: string) {
+  setState(state: ButtonState, riskSummary?: string, errorMessage?: string) {
     this.state = state;
-    if (riskScore !== undefined) this.riskScore = riskScore;
+    if (riskSummary !== undefined) this.riskSummary = riskSummary;
     this.errorMessage = errorMessage ?? null;
     this.render();
   }
@@ -166,8 +166,8 @@ export class FloatingButton {
 
       case "done":
         this.button.innerHTML = `${CHECK_SVG}<span>Analysis ready</span>${
-          this.riskScore !== null
-            ? `<span class="fp-badge">${this.riskScore}/100</span>`
+          this.riskSummary
+            ? `<span class="fp-badge">${escapeHtml(this.riskSummary)}</span>`
             : ""
         }`;
         this.button.setAttribute("aria-label", "Analysis complete - click to view");
