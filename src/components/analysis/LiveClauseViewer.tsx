@@ -252,26 +252,44 @@ export function LiveClauseViewer({
             <div>
               <p className="text-sm font-semibold text-navy-200">PDF unavailable</p>
               <p className="text-xs text-navy-500">
-                Showing the exact clause quote and surrounding text instead.
+                {clause.char_start === clause.char_end
+                  ? "Showing the exact clause quote instead (offsets could not be located in text)."
+                  : "Showing the exact clause quote and surrounding text instead."}
               </p>
             </div>
           </div>
 
-          <blockquote className="mt-5 rounded-2xl border border-navy-700 bg-white p-5 text-sm leading-7 text-navy-300">
-            <span>{excerpt.prefix}</span>
-            <mark
-              className={
-                clause.severity === "HIGH"
-                  ? "rounded bg-red-100 px-1 text-red-700"
-                  : clause.severity === "MEDIUM"
-                    ? "rounded bg-amber-100 px-1 text-amber-700"
-                    : "rounded bg-emerald-100 px-1 text-emerald-700"
-              }
-            >
-              {excerpt.highlighted}
-            </mark>
-            <span>{excerpt.suffix}</span>
-          </blockquote>
+          {clause.char_start === clause.char_end ? (
+            <blockquote className="mt-5 rounded-2xl border border-navy-700 bg-white p-5 text-sm leading-7 text-navy-300">
+              <mark
+                className={
+                  clause.severity === "HIGH"
+                    ? "rounded bg-red-100 px-1 text-red-700"
+                    : clause.severity === "MEDIUM"
+                      ? "rounded bg-amber-100 px-1 text-amber-700"
+                      : "rounded bg-emerald-100 px-1 text-emerald-700"
+                }
+              >
+                {clause.quote}
+              </mark>
+            </blockquote>
+          ) : (
+            <blockquote className="mt-5 rounded-2xl border border-navy-700 bg-white p-5 text-sm leading-7 text-navy-300">
+              <span>{excerpt.prefix}</span>
+              <mark
+                className={
+                  clause.severity === "HIGH"
+                    ? "rounded bg-red-100 px-1 text-red-700"
+                    : clause.severity === "MEDIUM"
+                      ? "rounded bg-amber-100 px-1 text-amber-700"
+                      : "rounded bg-emerald-100 px-1 text-emerald-700"
+                }
+              >
+                {excerpt.highlighted}
+              </mark>
+              <span>{excerpt.suffix}</span>
+            </blockquote>
+          )}
         </div>
       )}
     </div>
