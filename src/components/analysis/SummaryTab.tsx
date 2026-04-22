@@ -8,6 +8,7 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import { CounterpartyReputationCard } from "@/components/analysis/CounterpartyReputationCard";
 import type { AnalysisResult } from "@/components/analysis/types";
 
 const TERM_ICONS = {
@@ -108,6 +109,15 @@ export function SummaryTab({ analysis }: { analysis: AnalysisResult }) {
           ))}
         </ul>
       </section>
+
+      {analysis.reputation ? (
+        <section
+          className="opacity-0"
+          style={{ animation: "fp-fade-in-up 0.45s ease-out 0.36s forwards" }}
+        >
+          <CounterpartyReputationCard reputation={analysis.reputation} />
+        </section>
+      ) : null}
     </div>
   );
 }

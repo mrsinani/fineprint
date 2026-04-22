@@ -7,6 +7,7 @@ import { extractText } from "@/lib/extractText";
 import { extractTextFromBuffer } from "@/lib/extractText";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { getCounterpartyReputation } from "@/lib/reputation";
 import type { UserSensitivityPreferences } from "@/lib/sensitivity";
 
 // --- OpenAI Fetch Helper ---
@@ -302,6 +303,31 @@ Rules:
       inputAlreadyAnonymized
         ? rawResult
         : JSON.parse(deanonymizeText(JSON.stringify(rawResult), vault));
+
+    const summary =
+      finalData.summary && typeof finalData.summary === "object"
+        ? (finalData.summary as { parties?: Array<{ role?: string; name?: string }> })
+        : null;
+
+    const parties = Array.isArray(summary?.parties)
+      ? summary.parties.flatMap((party) => {
+          if (!party || typeof party !== "object") return [];
+          const role = typeof party.role === "string" ? party.role : "";
+          const name = typeof party.name === "string" ? party.name : "";
+          if (!role || !name) return [];
+          return [{ role, name }];
+        })
+      : [];
+
+    try {
+      finalData.reputation_report = await getCounterpartyReputation(
+        documentType || null,
+        parties,
+      );
+    } catch (reputationError) {
+      console.error("Reputation lookup failed:", reputationError);
+      finalData.reputation_report = null;
+    }
 
     return NextResponse.json(finalData);
 

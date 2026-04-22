@@ -102,6 +102,7 @@ export async function POST(req: Request) {
     summary: analysisResult.summary ?? null,
     clauses: analysisResult.clauses ?? null,
     action_items: analysisResult.action_items ?? null,
+    reputation_report: analysisResult.reputation_report ?? null,
     overall_risk_score: analysisResult.overall_risk_score ?? null,
     raw_text,
   });

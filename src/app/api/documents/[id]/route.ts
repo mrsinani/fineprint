@@ -34,7 +34,7 @@ export async function GET(
 
   const { data: analysis } = await supabase
     .from("analyses")
-    .select("summary, clauses, action_items, overall_risk_score")
+    .select("summary, clauses, action_items, reputation_report, overall_risk_score")
     .eq("document_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -49,6 +49,7 @@ export async function GET(
           summary: analysis.summary ?? defaultSummary,
           clauses: analysis.clauses ?? [],
           action_items: analysis.action_items ?? [],
+          reputation_report: analysis.reputation_report ?? null,
           overall_risk_score:
             analysis.overall_risk_score ?? doc.overall_risk_score ?? 0,
         }

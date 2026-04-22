@@ -28,6 +28,10 @@ function mapDbRowsToPageData(
     plain_english: summary.plain_english,
     clauses: analysis.clauses,
     action_items: analysis.action_items,
+    reputation_report:
+      analysis.reputation_report && typeof analysis.reputation_report === "object"
+        ? analysis.reputation_report
+        : null,
     risk_score:
       typeof analysis.overall_risk_score === "number"
         ? analysis.overall_risk_score

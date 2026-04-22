@@ -286,7 +286,7 @@ export default function UploadPage() {
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: pastedText }),
+          body: JSON.stringify({ text: pastedText, documentType }),
         });
 
         const responseText = await response.text();
