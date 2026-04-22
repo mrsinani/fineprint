@@ -59,7 +59,7 @@ const tierToSeverity: Record<number, ClauseSeverity> = { 0: "LOW", 1: "MEDIUM", 
 export function computeClauseSeverity(clause: {
   category: string[];
   quote: string;
-}): { severity: Severity; triggered_features: string[] } {
+}): { severity: ClauseSeverity; triggered_features: string[] } {
   // Evaluate ALL matched taxonomy categories, use the highest base severity tier
   const matchedEntries = clause.category
     .map((catId) => TAXONOMY.find((t) => t.id === catId))
@@ -149,10 +149,10 @@ export function computeClauseSeverity(clause: {
 }
 
 // Relative weights — only the ratios matter for the normalized formula below
-const SEVERITY_WEIGHTS: Record<Severity, number> = { HIGH: 3, MEDIUM: 1.5, LOW: 0.5 };
+const SEVERITY_WEIGHTS: Record<ClauseSeverity, number> = { HIGH: 3, MEDIUM: 1.5, LOW: 0.5 };
 
 export function computeDocumentScore(
-  clauses: { severity: Severity; category?: string[] }[],
+  clauses: { severity: ClauseSeverity; category?: string[] }[],
   sensitivityPrefs?: UserSensitivityPreferences,
 ): number {
   if (clauses.length === 0) return 0;
