@@ -4,15 +4,62 @@ import {
   type UserSensitivityPreferences,
 } from "./sensitivity";
 
-type Severity = "HIGH" | "MEDIUM" | "LOW";
+export type ClauseSeverity = "HIGH" | "MEDIUM" | "LOW";
 
-const severityToTier: Record<Severity, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
-const tierToSeverity: Record<number, Severity> = { 0: "LOW", 1: "MEDIUM", 2: "HIGH" };
+export interface ClauseSeverityCounts {
+  total: number;
+  high: number;
+  medium: number;
+  low: number;
+  concerning: number;
+}
+
+export function getClauseSeverityCounts(
+  clauses: { severity: ClauseSeverity }[],
+): ClauseSeverityCounts {
+  const counts: ClauseSeverityCounts = {
+    total: clauses.length,
+    high: 0,
+    medium: 0,
+    low: 0,
+    concerning: 0,
+  };
+
+  for (const clause of clauses) {
+    if (clause.severity === "HIGH") {
+      counts.high += 1;
+    } else if (clause.severity === "MEDIUM") {
+      counts.medium += 1;
+    } else {
+      counts.low += 1;
+    }
+  }
+
+  counts.concerning = counts.high + counts.medium;
+  return counts;
+}
+
+export function formatRiskSummaryCounts(counts: ClauseSeverityCounts): string {
+  if (counts.total === 0) {
+    return "No clauses flagged";
+  }
+  return `${counts.high} high risk, ${counts.medium} medium, ${counts.low} low`;
+}
+
+export function formatConcerningClauseSummary(counts: ClauseSeverityCounts): string {
+  if (counts.total === 0) {
+    return "No clauses flagged as concerning";
+  }
+  return `${counts.concerning} of ${counts.total} clauses flagged as concerning`;
+}
+
+const severityToTier: Record<ClauseSeverity, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+const tierToSeverity: Record<number, ClauseSeverity> = { 0: "LOW", 1: "MEDIUM", 2: "HIGH" };
 
 export function computeClauseSeverity(clause: {
   category: string[];
   quote: string;
-}): { severity: Severity; triggered_features: string[] } {
+}): { severity: ClauseSeverity; triggered_features: string[] } {
   // Evaluate ALL matched taxonomy categories, use the highest base severity tier
   const matchedEntries = clause.category
     .map((catId) => TAXONOMY.find((t) => t.id === catId))
@@ -102,10 +149,10 @@ export function computeClauseSeverity(clause: {
 }
 
 // Relative weights — only the ratios matter for the normalized formula below
-const SEVERITY_WEIGHTS: Record<Severity, number> = { HIGH: 3, MEDIUM: 1.5, LOW: 0.5 };
+const SEVERITY_WEIGHTS: Record<ClauseSeverity, number> = { HIGH: 3, MEDIUM: 1.5, LOW: 0.5 };
 
 export function computeDocumentScore(
-  clauses: { severity: Severity; category?: string[] }[],
+  clauses: { severity: ClauseSeverity; category?: string[] }[],
   sensitivityPrefs?: UserSensitivityPreferences,
 ): number {
   if (clauses.length === 0) return 0;

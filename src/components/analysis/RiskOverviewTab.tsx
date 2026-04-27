@@ -60,7 +60,7 @@ export function RiskOverviewTab({ analysis }: { analysis: AnalysisResult }) {
           </div>
         </div>
 
-        <RiskScoreBadge score={analysis.risk_score} />
+        <RiskScoreBadge analysis={analysis} />
       </section>
 
       {/* Severity filter cards */}

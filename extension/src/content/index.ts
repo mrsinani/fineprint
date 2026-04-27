@@ -75,7 +75,22 @@ function init() {
         title: string;
         url: string;
       };
-      fab!.setState("done", result.overall_risk_score);
+      const clauseCounts = (result.clauses ?? []).reduce(
+        (acc, clause) => {
+          if (clause.severity === "HIGH") acc.high += 1;
+          else if (clause.severity === "MEDIUM") acc.medium += 1;
+          else acc.low += 1;
+          return acc;
+        },
+        { high: 0, medium: 0, low: 0 },
+      );
+      const concerningCount = clauseCounts.high + clauseCounts.medium;
+      const totalCount = clauseCounts.high + clauseCounts.medium + clauseCounts.low;
+      const badgeText =
+        totalCount === 0
+          ? "No clauses flagged"
+          : `${concerningCount}/${totalCount} concerning`;
+      fab!.setState("done", badgeText);
       overlay!.show(result, title, window.location.href, currentText);
     } else {
       const errorMsg = (response?.payload as { error?: string })?.error ?? "Analysis failed";

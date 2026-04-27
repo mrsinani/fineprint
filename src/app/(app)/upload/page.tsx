@@ -328,6 +328,9 @@ export default function UploadPage() {
         <p className="mt-3 max-w-2xl text-sm text-navy-500">
           Before analysis, you can optionally review and edit the anonymized text that will be sent to OpenAI for an extra privacy check.
         </p>
+        <p className="mt-3 max-w-2xl text-sm text-navy-500">
+          This analysis is informational only and not legal advice. If you need legal guidance, consult a licensed attorney before signing or relying on any contract.
+        </p>
       </div>
       <div
         className="relative z-20 opacity-0"

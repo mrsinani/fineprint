@@ -205,16 +205,16 @@ export function ProfileEditor({
               personalize your risk scores.
             </p>
           </div>
-          <Link
+          {sensitivityPreferences &&
+            Object.keys(sensitivityPreferences).length > 0
+              ? <Link
             href="/onboarding"
             className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-navy-700 px-4 py-2.5 text-sm font-semibold text-navy-200 transition-colors hover:border-gold-500 hover:text-gold-700"
           >
             <RotateCcw size={14} strokeWidth={2} />
-            {sensitivityPreferences &&
-            Object.keys(sensitivityPreferences).length > 0
-              ? "Edit preferences"
-              : "Set up now"}
+            Edit preferences
           </Link>
+              : ""}
         </div>
 
         {sensitivityPreferences &&

@@ -30,7 +30,12 @@ Either party may request deletion or return of confidential materials at the end
 function findOffsets(text: string, quote: string) {
   const char_start = text.indexOf(quote);
   if (char_start === -1) {
-    return { char_start: 0, char_end: Math.min(quote.length, text.length) };
+    // Quote not found in text — likely due to whitespace differences or anonymization.
+    // Return valid but empty offsets instead of pointing to start of document.
+    console.warn(
+      `[FinePrint] Quote not found in document text. This may indicate whitespace or formatting differences. Quote: "${quote.slice(0, 100)}..."`
+    );
+    return { char_start: 0, char_end: 0 };
   }
 
   return {

@@ -8,6 +8,7 @@ import { getLocalDocumentAnalysisById } from "@/components/analysis/data";
 import { ActionItemsTab } from "@/components/analysis/ActionItemsTab";
 import { RiskOverviewTab } from "@/components/analysis/RiskOverviewTab";
 import { SummaryTab } from "@/components/analysis/SummaryTab";
+import { formatConcerningClauseSummary, formatRiskSummaryCounts, getClauseSeverityCounts } from "@/lib/scoring";
 import type { DocumentAnalysisPageData } from "@/components/analysis/types";
 
 const RiskHeatmapView = dynamic(
@@ -49,6 +50,7 @@ export function DocumentAnalysisShell({
   }, [initialDocument.id]);
 
   const document = localDocument ?? initialDocument;
+  const clauseCounts = getClauseSeverityCounts(document.analysis.clauses);
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">
@@ -83,10 +85,16 @@ export function DocumentAnalysisShell({
 
           <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 backdrop-blur-sm">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-400">
-              Overall score
+              Risk summary
             </p>
-            <p className="mt-2 text-4xl font-bold text-navy-100">
-              {document.analysis.risk_score}
+            <p className="mt-2 text-3xl font-bold text-navy-100">
+              {formatConcerningClauseSummary(clauseCounts)}
+            </p>
+            <p className="mt-2 text-sm text-navy-500">
+              {formatRiskSummaryCounts(clauseCounts)}
+            </p>
+            <p className="mt-3 text-xs leading-relaxed text-navy-500">
+              This analysis is informational only and is not legal advice. Consult a lawyer before acting on or signing any contract.
             </p>
           </div>
         </div>
