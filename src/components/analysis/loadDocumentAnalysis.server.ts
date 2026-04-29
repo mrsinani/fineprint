@@ -124,6 +124,13 @@ export async function getOwnedDocumentAnalysisState(
     .maybeSingle();
 
   if (!analysis || typeof analysis !== "object") {
+    console.log("[fineprint:analysis] document has no analysis row", {
+      documentId,
+      userId,
+      title: typeof d.title === "string" ? d.title : null,
+      fileName: typeof d.file_name === "string" ? d.file_name : null,
+    });
+
     return {
       status: "no_analysis",
       doc: {

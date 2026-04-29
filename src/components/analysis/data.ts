@@ -328,6 +328,8 @@ function normalizeReputationSource(raw: unknown): ReputationSource | null {
   const source = raw as Record<string, unknown>;
   const provider =
     typeof source.provider === "string" ? source.provider : "Web";
+  const referenceType =
+    typeof source.reference_type === "string" ? source.reference_type : undefined;
   const title = typeof source.title === "string" ? source.title : "";
   const url = typeof source.url === "string" ? source.url : "";
   const snippet = typeof source.snippet === "string" ? source.snippet : "";
@@ -341,7 +343,7 @@ function normalizeReputationSource(raw: unknown): ReputationSource | null {
 
   if (!title && !url && !snippet) return null;
 
-  return { provider, title, url, snippet, sentiment };
+  return { provider, reference_type: referenceType, title, url, snippet, sentiment };
 }
 
 function normalizeReputationReport(raw: unknown): ReputationReport | null {

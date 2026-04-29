@@ -54,7 +54,11 @@ export async function POST(req: Request) {
     rawText,
   } = body;
 
-  if (!storagePath || !analysisResult || !docId) {
+  const hasStoredFile = typeof storagePath === "string" && storagePath.length > 0;
+  const hasRawText = typeof rawText === "string" && rawText.trim().length > 0;
+  const nextDocId = typeof docId === "string" && docId.length > 0 ? docId : crypto.randomUUID();
+
+  if (!analysisResult || (!hasStoredFile && !hasRawText)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -64,7 +68,7 @@ export async function POST(req: Request) {
   let raw_text: string | null = null;
   if (typeof rawText === "string" && rawText.trim().length > 0) {
     raw_text = rawText;
-  } else {
+  } else if (hasStoredFile) {
     try {
       const { data: fileData, error: dlError } = await supabase.storage
         .from("documents")
@@ -80,25 +84,27 @@ export async function POST(req: Request) {
 
   // Insert document row
   const { error: docError } = await supabase.from("documents").insert({
-    id: docId,
+    id: nextDocId,
     user_id: userId,
-    title: title ?? fileName ?? "Untitled",
-    file_name: fileName,
-    file_type: fileType,
-    file_path: storagePath,
+    title: title ?? fileName ?? "Pasted contract",
+    file_name: fileName ?? "Pasted contract",
+    file_type: fileType ?? "text/plain",
+    file_path: hasStoredFile ? storagePath : null,
     page_count: pageCount ?? 0,
     document_type: documentType,
     overall_risk_score: analysisResult.overall_risk_score ?? null,
   });
 
   if (docError) {
-    await supabase.storage.from("documents").remove([storagePath]);
+    if (hasStoredFile) {
+      await supabase.storage.from("documents").remove([storagePath]);
+    }
     return NextResponse.json({ error: docError.message }, { status: 500 });
   }
 
   // Insert analysis row
   const { error: analysisError } = await supabase.from("analyses").insert({
-    document_id: docId,
+    document_id: nextDocId,
     summary: analysisResult.summary ?? null,
     clauses: analysisResult.clauses ?? null,
     action_items: analysisResult.action_items ?? null,
@@ -108,10 +114,12 @@ export async function POST(req: Request) {
   });
 
   if (analysisError) {
-    await supabase.from("documents").delete().eq("id", docId);
-    await supabase.storage.from("documents").remove([storagePath]);
+    await supabase.from("documents").delete().eq("id", nextDocId);
+    if (hasStoredFile) {
+      await supabase.storage.from("documents").remove([storagePath]);
+    }
     return NextResponse.json({ error: analysisError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ id: docId });
+  return NextResponse.json({ id: nextDocId });
 }

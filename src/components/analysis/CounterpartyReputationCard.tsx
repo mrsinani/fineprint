@@ -137,7 +137,9 @@ export function CounterpartyReputationCard({
                           {source.title || source.url}
                         </p>
                         <p className="mt-1 text-xs uppercase tracking-[0.14em] text-navy-500">
-                          {source.provider}
+                          {source.reference_type
+                            ? `${source.provider} - ${source.reference_type}`
+                            : source.provider}
                         </p>
                       </div>
                       <ExternalLink size={16} className="shrink-0 text-navy-400" />

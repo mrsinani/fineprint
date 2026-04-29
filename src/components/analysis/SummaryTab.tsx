@@ -21,6 +21,12 @@ const TERM_ICONS = {
 } as const;
 
 export function SummaryTab({ analysis }: { analysis: AnalysisResult }) {
+  console.log("[fineprint:analysis] SummaryTab reputation state", {
+    hasReputation: Boolean(analysis.reputation),
+    reputation: analysis.reputation,
+    parties: analysis.parties,
+  });
+
   return (
     <div className="space-y-8">
       <section
@@ -117,7 +123,14 @@ export function SummaryTab({ analysis }: { analysis: AnalysisResult }) {
         >
           <CounterpartyReputationCard reputation={analysis.reputation} />
         </section>
-      ) : null}
+      ) : (
+        <section
+          className="rounded-[28px] border border-dashed border-navy-700 bg-white p-6 text-sm text-navy-400 opacity-0 shadow-sm"
+          style={{ animation: "fp-fade-in-up 0.45s ease-out 0.36s forwards" }}
+        >
+          No counterparty reputation lookup was attached to this analysis.
+        </section>
+      )}
     </div>
   );
 }

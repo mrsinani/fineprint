@@ -53,6 +53,7 @@ export type ReputationStatus = "available" | "unavailable";
 
 export interface ReputationSource {
   provider: string;
+  reference_type?: string;
   title: string;
   url: string;
   snippet: string;
