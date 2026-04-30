@@ -223,105 +223,93 @@ export default function UploadPage() {
     setStatusMessage("");
 
     try {
+      let targetFile: File;
+      let approvedReviewText: string;
+      let fileTitle: string;
+
       if (mode === "file") {
         if (!analysisFile) return;
-        const approvedReviewText = reviewText.trim();
-
-        // 1. Upload file directly to Supabase Storage (bypasses Vercel size limit)
-        setStatusMessage("Uploading...");
-        const { storagePath, docId } = await ensureUploadedDocument();
-
-        // 2. Analyze via storage path (small JSON payload to Vercel)
-        setStatusMessage("Analyzing...");
-        const analyzeRes = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storagePath,
-            documentType,
-            fileType: analysisFile.type,
-            reviewedText: approvedReviewText || undefined,
-            reviewedTextIsAnonymized: approvedReviewText.length > 0,
-          }),
-        });
-
-        const analyzeText = await analyzeRes.text();
-        let data: unknown;
-        try {
-          data = JSON.parse(analyzeText);
-        } catch {
-          throw new Error(`Server error (${analyzeRes.status}): ${analyzeText.slice(0, 120)}`);
-        }
-        if (!analyzeRes.ok) {
-          throw new Error(readApiError(data) || `Analysis error: ${analyzeRes.status}`);
-        }
-
-        // 3. Save document + analysis to database (small JSON payload)
-        setStatusMessage("Saving...");
-        const saveRes = await fetch("/api/documents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storagePath,
-            docId,
-            fileName: analysisFile.name,
-            fileType: analysisFile.type,
-            analysisResult: data,
-            documentType,
-            pageCount: totalPages,
-            title: analysisFile.name.replace(/\.[^/.]+$/, ""),
-            rawText: approvedReviewText || undefined,
-          }),
-        });
-
-        const saveData = await saveRes.json();
-        if (!saveRes.ok) {
-          throw new Error(saveData.error || `Save error: ${saveRes.status}`);
-        }
-
-        router.push(`/documents/${saveData.id}`);
+        targetFile = analysisFile;
+        approvedReviewText = reviewText.trim();
+        fileTitle = analysisFile.name.replace(/\.[^/.]+$/, "");
       } else {
-        // Text paste mode -- no storage needed
-        setStatusMessage("Analyzing...");
-        const response = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: pastedText, documentType }),
+        const trimmed = pastedText.trim();
+        if (trimmed.length === 0) return;
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, 19);
+        const generatedName = `Pasted text ${timestamp}.txt`;
+        targetFile = new File([pastedText], generatedName, {
+          type: "text/plain",
         });
-
-        const responseText = await response.text();
-        let data: unknown;
-        try {
-          data = JSON.parse(responseText);
-        } catch {
-          throw new Error(`Server error (${response.status}): ${responseText.slice(0, 120)}`);
-        }
-        if (!response.ok) {
-          throw new Error(readApiError(data) || `Server error: ${response.status}`);
-        }
-
-        setStatusMessage("Saving...");
-        const saveRes = await fetch("/api/documents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: "Pasted contract",
-            fileType: "text/plain",
-            analysisResult: data,
-            documentType,
-            pageCount: 1,
-            title: documentType || "Pasted contract",
-            rawText: pastedText,
-          }),
-        });
-
-        const saveData = await saveRes.json();
-        if (!saveRes.ok) {
-          throw new Error(saveData.error || `Save error: ${saveRes.status}`);
-        }
-
-        router.push(`/documents/${saveData.id}`);
+        approvedReviewText = "";
+        // Prefer the user's selected document type as the display title;
+        // fall back to "Pasted contract" so the dashboard never shows a raw
+        // timestamp. The underlying storage filename still uses the timestamp
+        // for uniqueness.
+        fileTitle = documentType || "Pasted contract";
       }
+
+      // 1. Upload file (or pasted text wrapped as .txt) to Supabase Storage
+      setStatusMessage("Uploading...");
+      const { storagePath, docId } =
+        mode === "file"
+          ? await ensureUploadedDocument()
+          : await uploadToStorage(targetFile);
+
+      // 2. Analyze via storage path
+      setStatusMessage("Analyzing...");
+      const analyzeRes = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePath,
+          documentType,
+          fileType: targetFile.type,
+          reviewedText: approvedReviewText || undefined,
+          reviewedTextIsAnonymized: approvedReviewText.length > 0,
+        }),
+      });
+
+      const analyzeText = await analyzeRes.text();
+      let data: unknown;
+      try {
+        data = JSON.parse(analyzeText);
+      } catch {
+        throw new Error(`Server error (${analyzeRes.status}): ${analyzeText.slice(0, 120)}`);
+      }
+      if (!analyzeRes.ok) {
+        throw new Error(readApiError(data) || `Analysis error: ${analyzeRes.status}`);
+      }
+
+      // 3. Save document + analysis to database
+      setStatusMessage("Saving...");
+      const saveRes = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePath,
+          docId,
+          fileName: targetFile.name,
+          fileType: targetFile.type,
+          analysisResult: data,
+          documentType,
+          pageCount: mode === "file" ? totalPages : 1,
+          title: fileTitle,
+          rawText:
+            mode === "file"
+              ? approvedReviewText || undefined
+              : pastedText,
+        }),
+      });
+
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        throw new Error(saveData.error || `Save error: ${saveRes.status}`);
+      }
+
+      router.push(`/documents/${saveData.id}`);
     } catch (error) {
       console.error("Analysis failed:", error);
       alert(error instanceof Error ? error.message : "Failed to analyze document.");

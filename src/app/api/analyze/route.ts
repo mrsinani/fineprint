@@ -318,10 +318,18 @@ Rules:
     );
 
     // --- 6. DE-ANONYMIZE AND RETURN ---
-    const finalData =
-      inputAlreadyAnonymized
-        ? rawResult
-        : JSON.parse(deanonymizeText(JSON.stringify(rawResult), vault));
+    // Swap placeholders back *inside* a JSON string, so escape each vault
+    // value with JSON.stringify (minus the outer quotes) to avoid producing
+    // invalid JSON when a real name/org contains `"`, `\`, or a newline.
+    const jsonSafeVault: Record<string, string> = Object.fromEntries(
+      Object.entries(vault).map(([placeholder, realValue]) => {
+        const encoded = JSON.stringify(realValue);
+        return [placeholder, encoded.slice(1, -1)];
+      }),
+    );
+    const finalData = inputAlreadyAnonymized
+      ? rawResult
+      : JSON.parse(deanonymizeText(JSON.stringify(rawResult), jsonSafeVault));
 
     const summary =
       finalData.summary && typeof finalData.summary === "object"

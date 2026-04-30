@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = "April 6, 2026";
+  const lastUpdated = "April 22, 2026";
 
   return (
     <div className="min-h-screen bg-[#fafbfc]">
@@ -50,18 +50,22 @@ export default function PrivacyPage() {
               personalize your experience.
             </p>
 
-            <h3 className="font-semibold text-[#1a2030] mt-4 mb-2">Page Content for Analysis</h3>
+            <h3 className="font-semibold text-[#1a2030] mt-4 mb-2">Documents You Submit</h3>
             <p>
-              When you choose to analyze a page, the text content of that page is sent to our
-              servers for AI-powered analysis. We also collect the page URL and title to help
-              you identify saved analyses. Page content is only sent when you explicitly trigger
-              an analysis.
+              When you upload a file (PDF, DOCX, or TXT) or paste contract text on the website,
+              that file and the extracted text are sent to our servers for AI-powered analysis.
+              Uploaded files are stored in private Supabase Storage scoped to your account. When
+              you analyze a page from the browser extension, the text, URL, and title of that page
+              are sent to our servers only when you explicitly trigger an analysis.
             </p>
 
-            <h3 className="font-semibold text-[#1a2030] mt-4 mb-2">Saved Analyses</h3>
+            <h3 className="font-semibold text-[#1a2030] mt-4 mb-2">Saved Analyses and Chat</h3>
             <p>
-              If you choose to save an analysis, the results, page title, source URL, and original
-              text are stored in your account so you can revisit them later.
+              If you save an analysis, the results, document title, source (file or URL), and
+              original text are stored in your account so you can revisit them. If you use the
+              in-app chatbot, the document context and the messages you send are processed by
+              our AI provider to generate answers and are stored as part of that document's
+              conversation history.
             </p>
 
             <h3 className="font-semibold text-[#1a2030] mt-4 mb-2">Local Extension Data</h3>
@@ -69,6 +73,23 @@ export default function PrivacyPage() {
               The browser extension stores your authentication token, basic profile info, your
               auto-detect preference, and the most recent analysis result locally on your device
               using the Chrome storage API.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Privacy-Preserving Analysis</h2>
+            <p>
+              Before we send your document text to our AI provider, we automatically scrub
+              personally identifying information such as names, email addresses, phone numbers,
+              and organization names, replacing them with placeholders like{" "}
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px]">[Person 1]</code>{" "}
+              or <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px]">[Email 1]</code>.
+              The original values never leave our servers. When the AI returns its analysis, we
+              swap the placeholders back so you see the familiar names. You can also preview and
+              further edit the anonymized text before analysis using our optional privacy review
+              step. Automated PII detection is not perfect, so we recommend avoiding documents
+              that contain highly sensitive data (e.g. government IDs, financial account numbers)
+              or using the privacy review to remove anything you do not want analyzed.
             </p>
           </section>
 
@@ -83,14 +104,43 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Data Sharing</h2>
+            <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Data Sharing and Subprocessors</h2>
             <p>
-              We do not sell, rent, or trade your personal information to third parties. Page
-              content submitted for analysis is sent to the OpenAI API to generate results.
-              The OpenAI API data usage policy states that data sent through the API is not used
-              to train their models. We do not use your data to train any AI models. We may
-              use third-party service providers (hosting, authentication, database) that process
-              data on our behalf under strict confidentiality obligations.
+              We do not sell, rent, or trade your personal information to third parties, and we
+              do not use your data to train any AI models. We rely on a small number of trusted
+              service providers (subprocessors) that process data on our behalf under strict
+              confidentiality obligations:
+            </p>
+            <ul className="list-disc pl-5 space-y-2 mt-3">
+              <li>
+                <strong>Clerk</strong> — user authentication and account management.
+              </li>
+              <li>
+                <strong>Supabase</strong> — database and private file storage for documents and
+                analyses.
+              </li>
+              <li>
+                <strong>OpenAI</strong> — AI analysis and chat responses. Text is sent through
+                the OpenAI API after PII scrubbing. Per OpenAI's API data policy, data sent
+                through the API is not used to train their models.
+              </li>
+              <li>
+                <strong>Vercel</strong> — website and API hosting.
+              </li>
+              <li>
+                <strong>Google Programmable Search</strong> — used when you request public web
+                reviews of a company or service. Only your search query is sent; your document
+                text is not.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Where Your Data Is Processed</h2>
+            <p>
+              Our servers and databases are hosted in the United States. If you are accessing
+              FinePrint from another country, your data will be transferred to and processed in
+              the United States.
             </p>
           </section>
 
@@ -109,6 +159,23 @@ export default function PrivacyPage() {
               You can access, update, or delete your account and saved data at any time through
               your FinePrint dashboard. To request complete deletion of your data, contact us
               at the email below.
+            </p>
+            <p className="mt-3">
+              Depending on where you live, you may have additional rights under laws such as the
+              GDPR (EEA/UK) or CCPA (California), including the right to access, correct, delete,
+              or port your personal data, and the right to object to certain processing. We do
+              not sell personal information. To exercise any of these rights, contact us at the
+              email below and we will respond within the timeframes required by applicable law.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-[#1a2030] mb-3">Children's Privacy</h2>
+            <p>
+              FinePrint is not directed to children. You must be at least 13 years old (or 16 in
+              the EEA/UK) to use the service. We do not knowingly collect personal information
+              from children below these ages; if you believe a child has provided us with
+              personal information, please contact us and we will delete it.
             </p>
           </section>
 

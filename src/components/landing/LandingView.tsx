@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ChevronDown,
+  Chrome,
   FileSearch,
   FileUp,
   Layers,
@@ -12,6 +13,19 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+
+function AppleLogo({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      className={className}
+    >
+      <path d="M17.05 12.04c-.01-2.23 1.89-3.3 1.98-3.35-1.06-1.53-2.71-1.74-3.29-1.76-1.4-.14-2.74.81-3.45.81-.73 0-1.83-.79-3-.77-1.51.02-2.93.88-3.7 2.21-1.6 2.69-.41 6.66 1.12 8.86.77 1.07 1.66 2.28 2.83 2.23 1.15-.05 1.58-.72 2.96-.72 1.37 0 1.77.72 2.96.69 1.23-.02 2-1.08 2.74-2.16.89-1.24 1.25-2.46 1.27-2.52-.02-.01-2.41-.94-2.42-3.52ZM14.81 5.46c.62-.75 1.04-1.8.93-2.84-.88.04-1.95.59-2.59 1.34-.57.66-1.08 1.73-.95 2.75.98.07 1.98-.5 2.61-1.25Z" />
+    </svg>
+  );
+}
 import {
   useEffect,
   useRef,
@@ -85,6 +99,9 @@ export function LandingView() {
             <a href="#how-it-works" className={navLinkClass}>
               How It Works
             </a>
+            <a href="#downloads" className={navLinkClass}>
+              Download
+            </a>
           </div>
           <div className="flex items-center justify-center gap-x-5 sm:justify-end">
             <Link href="/login" className={navLinkClass}>
@@ -130,6 +147,23 @@ export function LandingView() {
           >
             Get Started
           </Link>
+
+          <a
+            href="https://apps.apple.com/us/app/fineprint-ai/id6763127284"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Download FinePrint AI on the App Store"
+            className="mt-5 inline-block transition-transform duration-200 hover:scale-[1.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent sm:mt-6"
+          >
+            <Image
+              src="/app-store-badge.svg"
+              alt="Download on the App Store"
+              width={160}
+              height={47}
+              unoptimized
+              priority
+            />
+          </a>
         </div>
       </section>
 
@@ -285,6 +319,91 @@ export function LandingView() {
               </Link>
             </div>
           </Reveal>
+        </div>
+      </section>
+
+      {/* Get FinePrint everywhere */}
+      <section
+        id="downloads"
+        className="scroll-mt-20 border-t border-navy-800 bg-navy-900 px-4 py-16 sm:scroll-mt-24 sm:px-6 sm:py-20 md:px-10 lg:px-16 xl:px-20 lg:py-24"
+      >
+        <div className="mx-auto max-w-5xl">
+          <Reveal>
+            <h2 className="text-center text-3xl font-light text-navy-100 sm:text-4xl">
+              Get FinePrint everywhere
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-navy-400 sm:text-base">
+              Use the web app, scan contracts on the go with the iOS app, or
+              analyze any Terms of Service in your browser with the Chrome
+              extension.
+            </p>
+          </Reveal>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            <Reveal delay={100}>
+              <a
+                href="https://apps.apple.com/us/app/fineprint-ai/id6763127284"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex h-full flex-col rounded-2xl border border-navy-800 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-navy-700 hover:shadow-md sm:p-7"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-navy-100 text-white">
+                    <AppleLogo className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-600">
+                      iOS App
+                    </p>
+                    <h3 className="mt-1 font-display text-lg font-semibold text-navy-100">
+                      Scan and analyze on iPhone
+                    </h3>
+                  </div>
+                </div>
+                <p className="mt-4 flex-1 text-sm leading-relaxed text-navy-400">
+                  Snap a photo of any contract with your camera. On-device OCR,
+                  instant summaries, and a checklist of risks — designed for
+                  renters, freelancers, and founders.
+                </p>
+                <div className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-navy-100 px-5 py-2.5 text-sm font-semibold text-white transition-colors group-hover:bg-navy-200">
+                  Download on the App Store
+                  <ArrowRight size={16} aria-hidden />
+                </div>
+              </a>
+            </Reveal>
+
+            <Reveal delay={170}>
+              <a
+                href="https://chromewebstore.google.com/detail/fineprint-terms-of-servic/gannnlbjphlioiglckimemojhceclhle"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex h-full flex-col rounded-2xl border border-navy-800 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-navy-700 hover:shadow-md sm:p-7"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gold-100 text-gold-700">
+                    <Chrome className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+                  </div>
+                  <div>
+                    <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-600">
+                      Chrome Extension
+                    </p>
+                    <h3 className="mt-1 font-display text-lg font-semibold text-navy-100">
+                      Analyze any page in your browser
+                    </h3>
+                  </div>
+                </div>
+                <p className="mt-4 flex-1 text-sm leading-relaxed text-navy-400">
+                  Auto-detects Terms of Service, Privacy Policies, and User
+                  Agreements. One click to get a plain-language summary and risk
+                  score for whatever you&apos;re about to agree to.
+                </p>
+                <div className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-gold-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors group-hover:bg-gold-600">
+                  Add to Chrome
+                  <ArrowRight size={16} aria-hidden />
+                </div>
+              </a>
+            </Reveal>
+          </div>
         </div>
       </section>
 
