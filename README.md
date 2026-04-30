@@ -8,7 +8,7 @@ The repository contains the Next.js web app, Supabase-backed persistence, and su
 
 - Frontend: Next.js App Router, React, TypeScript, Tailwind CSS
 - Backend: Next.js Route Handlers, Supabase Auth, Postgres, Storage
-- AI: OpenAI API
+- AI: OpenAI API, optional Perplexity API for public reputation references
 - Auth: Clerk
 - Package manager: npm
 
@@ -20,6 +20,7 @@ The repository contains the Next.js web app, Supabase-backed persistence, and su
 - Review anonymized text before it is sent to OpenAI
 - Save document analyses to Supabase
 - Reopen prior analyses from the dashboard
+- Surface optional public counterparty reputation signals from social/public sources
 - Follow up with questions through a chatbot
 
 ## Project Structure
@@ -43,6 +44,7 @@ extension/
 - A Supabase project
 - A Clerk application
 - An OpenAI API key
+- Optional: a Perplexity API key for public counterparty reputation lookups
 
 Optional for local Supabase development:
 
@@ -59,6 +61,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
+PERPLEXITY_API_KEY=
 CLERK_SECRET_KEY=
 CLERK_WEBHOOK_SECRET=
 NEXT_PUBLIC_EXTENSION_ID=
@@ -74,6 +77,7 @@ Notes:
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are required by the app server and Supabase helpers.
 - `OPENAI_API_KEY` is required for document analysis and chat.
+- `PERPLEXITY_API_KEY` is optional. When present, the app uses Perplexity server-side to find public counterparty references from sources such as Reddit, ToS;DR, BBB, FTC, CFPB, and housing/public-record sources depending on document type.
 - `CLERK_SECRET_KEY` is required for authenticated server routes.
 - `CLERK_WEBHOOK_SECRET` is required if you are testing Clerk webhooks locally.
 - `NEXT_PUBLIC_EXTENSION_ID` is only needed for extension auth flows.
@@ -163,7 +167,7 @@ npx supabase functions serve
 
 - The README previously referenced `.env.local.example`, but that file is not in the repository.
 - The Next.js dev server is configured for port `3001`.
-- Running the app usually requires configuring Supabase, Clerk, and OpenAI before the UI is fully functional.
+- Running the app usually requires configuring Supabase, Clerk, and OpenAI before the UI is fully functional. Public reputation cards require `PERPLEXITY_API_KEY` or the legacy Google Custom Search variables.
 - Browser-extension flows may require additional extension-specific setup beyond the web app.
 
 ## Deployment
@@ -171,6 +175,6 @@ npx supabase functions serve
 - Frontend: Vercel
 - Database and storage: Supabase
 - Auth: Clerk
-- AI: OpenAI API
+- AI: OpenAI API, optional Perplexity API
 
 Before deploying, make sure the same environment variables from local development are configured in your hosting provider.

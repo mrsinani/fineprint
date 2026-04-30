@@ -42,15 +42,39 @@ export function DocumentAnalysisShell({
     const frame = window.requestAnimationFrame(() => {
       const nextDocument = getLocalDocumentAnalysisById(initialDocument.id);
       if (nextDocument) {
+        console.log("[fineprint:analysis] localStorage document candidate", {
+          id: initialDocument.id,
+          source: nextDocument.source,
+          hasLocalReputation: Boolean(nextDocument.analysis.reputation),
+          hasServerReputation: Boolean(initialDocument.analysis.reputation),
+        });
+
+        if (!nextDocument.analysis.reputation && initialDocument.analysis.reputation) {
+          console.log(
+            "[fineprint:analysis] ignoring localStorage document because it would hide server reputation data",
+          );
+          return;
+        }
+
         setLocalDocument(nextDocument);
       }
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [initialDocument.id]);
+  }, [initialDocument]);
 
   const document = localDocument ?? initialDocument;
   const clauseCounts = getClauseSeverityCounts(document.analysis.clauses);
+
+  useEffect(() => {
+    console.log("[fineprint:analysis] active document payload", {
+      id: document.id,
+      source: document.source,
+      hasReputation: Boolean(document.analysis.reputation),
+      reputation: document.analysis.reputation,
+      parties: document.analysis.parties,
+    });
+  }, [document]);
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">

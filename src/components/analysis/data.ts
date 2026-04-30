@@ -6,6 +6,8 @@ import type {
   DocumentParty,
   KeyTerm,
   KeyTermIcon,
+  ReputationReport,
+  ReputationSource,
   RiskClause,
   RiskSeverity,
 } from "@/components/analysis/types";
@@ -199,6 +201,43 @@ const SAMPLE_ACTION_ITEMS: ActionItem[] = [
   },
 ];
 
+const SAMPLE_REPUTATION_SOURCES: ReputationSource[] = [
+  {
+    provider: "Google Custom Search",
+    title: "Northwind Product Labs reviews on Glassdoor",
+    url: "https://www.glassdoor.com/",
+    snippet: "Employees mention heavy workloads, uneven management communication, and delayed bonus decisions.",
+    sentiment: "mixed",
+  },
+  {
+    provider: "Google Custom Search",
+    title: "Northwind Product Labs Reddit discussion",
+    url: "https://www.reddit.com/",
+    snippet: "Former employees describe a strong team but recurring concerns about unpaid overtime near launch deadlines.",
+    sentiment: "negative",
+  },
+];
+
+const SAMPLE_REPUTATION: ReputationReport = {
+  status: "available",
+  entity_name: "Northwind Product Labs Inc.",
+  entity_type: "company",
+  contract_type: "employment",
+  provider: "google-cse",
+  risk_level: "MEDIUM",
+  average_rating: null,
+  review_count: null,
+  confidence: "MEDIUM",
+  summary:
+    "Public review snippets suggest mixed sentiment, with the main concerns centered on workload, management communication, and compensation practices.",
+  top_complaints: ["Heavy workload", "Management communication", "Delayed or disputed compensation"],
+  red_flags: ["unpaid overtime"],
+  sources: SAMPLE_REPUTATION_SOURCES,
+  disclaimer:
+    "External reputation signals are noisy and can be biased. Use them as context, not proof.",
+  searched_at: "2026-04-02T15:00:00.000Z",
+};
+
 function buildSampleAnalysis(): AnalysisResult {
   return {
     overview:
@@ -217,6 +256,7 @@ function buildSampleAnalysis(): AnalysisResult {
     document_text: SAMPLE_DOCUMENT_TEXT,
     pdf_url: null,
     storage_path: null,
+    reputation: SAMPLE_REPUTATION,
   };
 }
 
@@ -285,6 +325,93 @@ function deriveActionItems(clauses: RiskClause[]): ActionItem[] {
     ),
     severity: clause.severity,
   }));
+}
+
+function normalizeReputationSource(raw: unknown): ReputationSource | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const source = raw as Record<string, unknown>;
+  const provider =
+    typeof source.provider === "string" ? source.provider : "Web";
+  const referenceType =
+    typeof source.reference_type === "string" ? source.reference_type : undefined;
+  const title = typeof source.title === "string" ? source.title : "";
+  const url = typeof source.url === "string" ? source.url : "";
+  const snippet = typeof source.snippet === "string" ? source.snippet : "";
+  const sentiment =
+    source.sentiment === "positive" ||
+    source.sentiment === "mixed" ||
+    source.sentiment === "negative" ||
+    source.sentiment === "neutral"
+      ? source.sentiment
+      : "neutral";
+
+  if (!title && !url && !snippet) return null;
+
+  return { provider, reference_type: referenceType, title, url, snippet, sentiment };
+}
+
+function normalizeReputationReport(raw: unknown): ReputationReport | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const report = raw as Record<string, unknown>;
+  const status =
+    report.status === "available" || report.status === "unavailable"
+      ? report.status
+      : null;
+  const entityName =
+    typeof report.entity_name === "string" ? report.entity_name : "";
+  const entityType =
+    report.entity_type === "company" || report.entity_type === "landlord"
+      ? report.entity_type
+      : null;
+
+  if (!status || !entityName || !entityType) return null;
+
+  return {
+    status,
+    entity_name: entityName,
+    entity_type: entityType,
+    contract_type:
+      typeof report.contract_type === "string" ? report.contract_type : null,
+    provider: typeof report.provider === "string" ? report.provider : "unknown",
+    risk_level:
+      report.risk_level === "HIGH" ||
+      report.risk_level === "MEDIUM" ||
+      report.risk_level === "LOW"
+        ? report.risk_level
+        : "LOW",
+    average_rating:
+      typeof report.average_rating === "number" ? report.average_rating : null,
+    review_count:
+      typeof report.review_count === "number" ? report.review_count : null,
+    confidence:
+      report.confidence === "HIGH" ||
+      report.confidence === "MEDIUM" ||
+      report.confidence === "LOW"
+        ? report.confidence
+        : "LOW",
+    summary: typeof report.summary === "string" ? report.summary : "",
+    top_complaints: Array.isArray(report.top_complaints)
+      ? report.top_complaints.filter(
+          (entry): entry is string => typeof entry === "string",
+        )
+      : [],
+    red_flags: Array.isArray(report.red_flags)
+      ? report.red_flags.filter((entry): entry is string => typeof entry === "string")
+      : [],
+    sources: Array.isArray(report.sources)
+      ? report.sources
+          .map((entry) => normalizeReputationSource(entry))
+          .filter((entry): entry is ReputationSource => entry !== null)
+      : [],
+    disclaimer:
+      typeof report.disclaimer === "string"
+        ? report.disclaimer
+        : "External reputation signals can be incomplete or biased.",
+    searched_at:
+      typeof report.searched_at === "string" ? report.searched_at : null,
+  };
 }
 
 function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult | null {
@@ -535,6 +662,9 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult |
           : null,
     storage_path:
       typeof raw.storage_path === "string" ? raw.storage_path : null,
+    reputation: normalizeReputationReport(
+      raw.reputation ?? raw.reputation_report ?? null,
+    ),
   };
 }
 

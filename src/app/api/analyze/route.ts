@@ -7,6 +7,7 @@ import { extractText } from "@/lib/extractText";
 import { extractTextFromBuffer } from "@/lib/extractText";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { getCounterpartyReputation } from "@/lib/reputation";
 import type { UserSensitivityPreferences } from "@/lib/sensitivity";
 
 // --- OpenAI Fetch Helper ---
@@ -61,6 +62,24 @@ async function askOpenAI(
     }
   }
   throw new Error("AI returned an incomplete response. Please try again.");
+}
+
+function inferDocumentTypeFromText(text: string): string | null {
+  const sample = text.slice(0, 12000).toLowerCase();
+  if (sample.includes("terms of service") || sample.includes("terms of use")) {
+    return "Terms of Service";
+  }
+  if (sample.includes("privacy policy")) return "Privacy Policy";
+  if (sample.includes("end user license") || sample.includes("eula")) {
+    return "End User License Agreement";
+  }
+  if (sample.includes("residential lease") || sample.includes("lease agreement")) {
+    return "Residential Lease Agreement";
+  }
+  if (sample.includes("non-disclosure") || sample.includes("confidentiality agreement")) {
+    return "Non Disclosure Agreement";
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -169,7 +188,8 @@ export async function POST(req: NextRequest) {
       TAXONOMY.map((t) => ({ id: t.id, name: t.name, description: t.description, baseSeverity: t.baseSeverity }))
     );
 
-    const docLabel = documentType || "legal document";
+    const inferredDocumentType = documentType || inferDocumentTypeFromText(rawDocumentText) || "";
+    const docLabel = inferredDocumentType || "legal document";
     const analysisPrompt = `You are an expert legal analyst extracting structured data from a ${docLabel}.
 
 You have the following taxonomy of clause categories. Map each risky clause to one or more category ids from this list:
@@ -302,6 +322,43 @@ Rules:
       inputAlreadyAnonymized
         ? rawResult
         : JSON.parse(deanonymizeText(JSON.stringify(rawResult), vault));
+
+    const summary =
+      finalData.summary && typeof finalData.summary === "object"
+        ? (finalData.summary as { parties?: Array<{ role?: string; name?: string }> })
+        : null;
+
+    const parties = Array.isArray(summary?.parties)
+      ? summary.parties.flatMap((party) => {
+          if (!party || typeof party !== "object") return [];
+          const role = typeof party.role === "string" ? party.role : "";
+          const name = typeof party.name === "string" ? party.name : "";
+          if (!role || !name) return [];
+          return [{ role, name }];
+        })
+      : [];
+
+    try {
+      console.log("[fineprint:analyze] starting reputation lookup", {
+        documentType: inferredDocumentType || null,
+        inputAlreadyAnonymized,
+        parties,
+      });
+      finalData.reputation_report = await getCounterpartyReputation(
+        inferredDocumentType || null,
+        parties,
+      );
+      console.log("[fineprint:analyze] reputation lookup result", {
+        isNull: finalData.reputation_report === null,
+        status: finalData.reputation_report?.status,
+        entity: finalData.reputation_report?.entity_name,
+        provider: finalData.reputation_report?.provider,
+        sourceCount: finalData.reputation_report?.sources?.length ?? 0,
+      });
+    } catch (reputationError) {
+      console.error("Reputation lookup failed:", reputationError);
+      finalData.reputation_report = null;
+    }
 
     return NextResponse.json(finalData);
 

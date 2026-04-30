@@ -286,7 +286,7 @@ export default function UploadPage() {
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: pastedText }),
+          body: JSON.stringify({ text: pastedText, documentType }),
         });
 
         const responseText = await response.text();
@@ -299,6 +299,28 @@ export default function UploadPage() {
         if (!response.ok) {
           throw new Error(readApiError(data) || `Server error: ${response.status}`);
         }
+
+        setStatusMessage("Saving...");
+        const saveRes = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: "Pasted contract",
+            fileType: "text/plain",
+            analysisResult: data,
+            documentType,
+            pageCount: 1,
+            title: documentType || "Pasted contract",
+            rawText: pastedText,
+          }),
+        });
+
+        const saveData = await saveRes.json();
+        if (!saveRes.ok) {
+          throw new Error(saveData.error || `Save error: ${saveRes.status}`);
+        }
+
+        router.push(`/documents/${saveData.id}`);
       }
     } catch (error) {
       console.error("Analysis failed:", error);
